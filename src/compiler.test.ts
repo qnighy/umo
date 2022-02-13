@@ -9,8 +9,8 @@ describe("compile", () => {
     expect(typeof compile("1 + 1")).toBe("string");
   });
 
-  xit("Compiles a text to JS", () => {
-    expect(compile("1 + 1")).toBe("1n + 1n");
+  it("Compiles a text to JS", () => {
+    expect(compile("1 + 1")).toBe("(1n + 1n)");
   });
 
   it("errors on parse error", () => {
