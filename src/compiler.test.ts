@@ -3,6 +3,7 @@ import fs from "fs";
 import { describe, expect, it, it as realIt, xit } from "@jest/globals";
 import { compile } from "./compiler";
 import { ParseError } from "./parser";
+import { TypeCheckerError } from "./typeck";
 
 describe("compile", () => {
   it("returns a string", () => {
@@ -28,6 +29,10 @@ describe("compile", () => {
       if (config.parseError) {
         it(testcaseName, () => {
           expect(() => compile(input)).toThrow(ParseError);
+        });
+      } else if (config.typeCheckError) {
+        it(testcaseName, () => {
+          expect(() => compile(input)).toThrow(TypeCheckerError);
         });
       } else {
         const expected = fs.readFileSync(path.resolve(testcaseDir, "output.js"), "utf8");

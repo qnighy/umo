@@ -32,6 +32,15 @@
 - Shift: `<<`, `>>` (not implemented)
 - Unary: `-`, `!` (not implemented)
 
+Note on types:
+
+- Arithmetic operators: different types cannot be mixed together.
+
+## Types
+
+- Primitive types: `int`, `f64`, ... (only `int` and `f64` are implemented now)
+- TBD
+
 ## Development
 
 Concept:
