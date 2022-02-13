@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import { describe, expect, it, it as realIt, xit } from "@jest/globals";
 import { compile } from "./compiler";
+import { ParseError } from "./parser";
 
 describe("compile", () => {
   it("returns a string", () => {
@@ -23,11 +24,17 @@ describe("compile", () => {
       const testcaseDir = path.resolve(testcasesDir, testcaseName);
       const config = JSON.parse(fs.readFileSync(path.resolve(testcaseDir, "config.json"), "utf8"));
       const input = fs.readFileSync(path.resolve(testcaseDir, "input.umo"), "utf8");
-      const expected = fs.readFileSync(path.resolve(testcaseDir, "output.js"), "utf8");
       const it = config.pending ? xit : realIt;
-      it(testcaseName, () => {
-        expect(compile(input)).toBe(expected);
-      });
+      if (config.parseError) {
+        it(testcaseName, () => {
+          expect(() => compile(input)).toThrow(ParseError);
+        });
+      } else {
+        const expected = fs.readFileSync(path.resolve(testcaseDir, "output.js"), "utf8");
+        it(testcaseName, () => {
+          expect(compile(input)).toBe(expected);
+        });
+      }
     }
   });
 });
