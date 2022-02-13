@@ -2,7 +2,16 @@
   "name": "umo-lang",
   "version": "0.1.0",
   "packageManager": "yarn@3.1.1",
-  "scripts": {},
-  "dependencies": {},
-  "devDependencies": {}
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.17.2",
+    "@babel/preset-env": "^7.16.11",
+    "@babel/preset-typescript": "^7.16.7",
+    "@jest/globals": "^27.5.1",
+    "babel-jest": "^27.5.1",
+    "jest": "^27.5.1",
+    "source-map-support": "^0.5.21"
+  }
 }
