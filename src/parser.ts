@@ -24,21 +24,23 @@ export class ParseError extends Error {
 
 export function parse(text: string): Expression {
   const tokens = tokenize(text);
-  return new Parser(tokens).parseExpression();
+  return new Parser(tokens).parseFullExpression();
 }
 
 class Parser {
   private pos = 0;
   constructor(public readonly tokens: readonly string[]) {}
-  public parsePrimaryExpression(): Expression {
+  private parsePrimaryExpression(): Expression {
     if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF");
+      throw new ParseError("Unexpected EOF (expected Expression)");
     }
     if (/\d+/.test(this.tokens[this.pos])) {
       return { type: "NumberExpression", value: parseInt(this.tokens[this.pos++]) };
+    } else {
+      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected Expression)`);
     }
   }
-  public parseExpression(): Expression {
+  private parseExpression(): Expression {
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF");
     }
@@ -52,6 +54,16 @@ class Parser {
         break;
       }
     }
+    return expr;
+  }
+  private parseEOF() {
+    if (this.pos < this.tokens.length) {
+      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected EOF)`);
+    }
+  }
+  public parseFullExpression(): Expression {
+    const expr = this.parseExpression();
+    this.parseEOF();
     return expr;
   }
 }

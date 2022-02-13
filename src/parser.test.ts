@@ -36,6 +36,18 @@ describe("parse", () => {
     };
     expect(tokenize("1 + (2 + 3)")).toEqual(expected);
   });
+
+  it("errors on early EOF", () => {
+    expect(() => parse("")).toThrow(/Unexpected EOF/);
+  });
+
+  it("errors on initial-position unknown token", () => {
+    expect(() => parse("\\")).toThrow(/Unexpected token/);
+  });
+
+  it("errors on mid-position unknown token", () => {
+    expect(() => parse("1 \\")).toThrow(/Unexpected token/);
+  });
 });
 
 describe("tokenize", () => {
