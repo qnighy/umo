@@ -12,6 +12,10 @@ describe("compile", () => {
     expect(compile("1 + 1")).toBe("1n + 1n");
   });
 
+  it("errors on parse error", () => {
+    expect(() => compile("1 +")).toThrow(/Unexpected EOF/);
+  });
+
   describe("testcases", () => {
     const testcasesDir = path.resolve(__dirname, "__testcases__");
     const testcaseNames = fs.readdirSync(testcasesDir);
