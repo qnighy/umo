@@ -8,8 +8,10 @@ export function compile(text: string): string {
 
 function toJSExpression(node: Expression): string {
   switch (node.type) {
-    case "NumberExpression":
+    case "IntegerLiteral":
       return `${node.value}n`;
+    case "FloatingPointLiteral":
+      return `${node.value}`;
     case "AddExpression":
       return `(${toJSExpression(node.lhs)} + ${toJSExpression(node.rhs)})`;
   }

@@ -1,14 +1,18 @@
 
-export type Expression = AddExpression | NumberExpression;
+export type Expression = AddExpression | IntegerLiteral | FloatingPointLiteral;
 export type AddExpression = {
   type: "AddExpression",
   lhs: Expression,
   rhs: Expression,
-}
-export type NumberExpression = {
-  type: "NumberExpression",
+};
+export type IntegerLiteral = {
+  type: "IntegerLiteral",
+  value: bigint,
+};
+export type FloatingPointLiteral = {
+  type: "FloatingPointLiteral",
   value: number,
-}
+};
 
 export class ParseError extends Error {
   constructor(message: string) {
@@ -34,8 +38,10 @@ class Parser {
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF (expected Expression)");
     }
-    if (/\d+/.test(this.tokens[this.pos])) {
-      return { type: "NumberExpression", value: parseInt(this.tokens[this.pos++]) };
+    if (/^\d+$/.test(this.tokens[this.pos])) {
+      return { type: "IntegerLiteral", value: BigInt(this.tokens[this.pos++]) };
+    } else if (/^\d+\.\d+$/.test(this.tokens[this.pos])) {
+      return { type: "FloatingPointLiteral", value: Number(this.tokens[this.pos++]) };
     } else {
       throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected Expression)`);
     }
@@ -72,8 +78,18 @@ export function tokenize(text: string): string[] {
   const tokens: string[] = [];
   let i = 0;
   while (i < text.length) {
+    const start = i;
     const c = text[i++];
     if (/\s/.test(c)) continue;
+    if (/\d/.test(c)) {
+      while (i < text.length && /\d/.test(text[i])) i++;
+      if (i + 1 < text.length && text[i] === "." && /\d/.test(text[i + 1])) {
+        i++;
+        while (i < text.length && /\d/.test(text[i])) i++;
+      }
+      tokens.push(text.slice(start, i));
+      continue;
+    }
     tokens.push(c);
   }
   return tokens;

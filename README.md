@@ -15,11 +15,11 @@
 
 ### Numbers
 
-- Decimal integer: `/0|[1-9][0-9]*/` (Only one-digit numbers are implemented now)
+- Decimal integer: `/\d+/` (octal-like numbers like `018` may be forbidden later)
 - Hexadecimal integer (not implemented)
 - Octal integer (not implemented)
 - Binary integer (not implemented)
-- Decimal floating-point number (not implemented)
+- Decimal floating-point number `/\d+\.\d+/`
 
 ### Operators
 
