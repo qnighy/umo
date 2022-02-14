@@ -89,6 +89,10 @@ export function tokenize(text: string): string[] {
       }
       tokens.push(text.slice(start, i));
       continue;
+    } else if (/[a-zA-Z_]/.test(c)) {
+      while (i < text.length && /[a-zA-Z_0-9]/.test(text[i])) i++;
+      tokens.push(text.slice(start, i));
+      continue;
     }
     tokens.push(c);
   }

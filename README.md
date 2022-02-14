@@ -12,6 +12,12 @@
 ### Primary
 
 - Parentheses: `1 + (2 + 3)` (not implemented)
+- Identifiers
+- Numbers
+
+### Identifiers
+
+Currently `/[a-zA-Z_][a-zA-Z_0-9]*/`
 
 ### Numbers
 

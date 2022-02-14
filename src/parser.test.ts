@@ -75,4 +75,12 @@ describe("tokenize", () => {
   it("tokenizes a stray dot after integer", () => {
     expect(tokenize("123.x")).toEqual(["123", ".", "x"]);
   });
+
+  it("tokenizes an identifier", () => {
+    expect(tokenize("foo123 + abc_def")).toEqual(["foo123", "+", "abc_def"]);
+  });
+
+  it("disallows identifiers starting with digits", () => {
+    expect(tokenize("123foo")).toEqual(["123", "foo"]);
+  });
 });
