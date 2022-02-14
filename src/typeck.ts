@@ -1,9 +1,12 @@
 import { Expression } from "./parser";
 
-export type Type = BuiltinType;
+export type Type = BuiltinType | AmbiguousType;
 export type BuiltinType = {
   type: "BuiltinType";
   kind: "int" | "f64";
+};
+export type AmbiguousType = {
+  type: "AmbiguousType";
 };
 
 export class TypeCheckerError extends Error {
@@ -28,10 +31,14 @@ function getType(ast: Expression): Type {
       return { type: "BuiltinType", kind: "int" };
     case "FloatingPointLiteral":
       return { type: "BuiltinType", kind: "f64" };
+    case "VariableReference":
+      return { type: "AmbiguousType" }; // TODO
     case "AddExpression": {
       const lhsType = getType(ast.lhs);
       const rhsType = getType(ast.rhs);
-      if (lhsType.type === "BuiltinType" && lhsType.kind === "int" && rhsType.type === "BuiltinType" && rhsType.kind === "int") {
+      if (lhsType.type === "AmbiguousType" || rhsType.type === "AmbiguousType") {
+        return { type: "AmbiguousType" };
+      } else if (lhsType.type === "BuiltinType" && lhsType.kind === "int" && rhsType.type === "BuiltinType" && rhsType.kind === "int") {
         return { type: "BuiltinType", kind: "int" };
       } else if (lhsType.type === "BuiltinType" && lhsType.kind === "f64" && rhsType.type === "BuiltinType" && rhsType.kind === "f64") {
         return { type: "BuiltinType", kind: "f64" };

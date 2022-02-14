@@ -22,4 +22,10 @@ describe("typecheck", () => {
   it("rejects f64-int addition", () => {
     expect(() => typecheck(parse("1.2 + 3.4 + 5"))).toThrow(/Invalid types in addition/);
   });
+
+  it("accepts identifier", () => {
+    expect(() => typecheck(parse("foo + 123"))).not.toThrow();
+    expect(() => typecheck(parse("123 + bar"))).not.toThrow();
+    expect(() => typecheck(parse("foo + bar"))).not.toThrow();
+  })
 });

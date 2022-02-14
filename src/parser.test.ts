@@ -46,6 +46,21 @@ describe("parse", () => {
     expect(parse("1.0 + 1.25")).toEqual(expected);
   });
 
+  it("parses identifiers", () => {
+    const expected: Expression = {
+      type: "AddExpression",
+      lhs: {
+        type: "VariableReference",
+        name: "foo",
+      },
+      rhs: {
+        type: "VariableReference",
+        name: "bar",
+      },
+    };
+    expect(parse("foo + bar")).toEqual(expected);
+  });
+
   it("errors on early EOF", () => {
     expect(() => parse("")).toThrow(/Unexpected EOF/);
   });

@@ -14,6 +14,8 @@ function toJSExpression(node: Expression): string {
       return `${node.value}n`;
     case "FloatingPointLiteral":
       return `${node.value}`;
+    case "VariableReference":
+      return `${node.name}`;
     case "AddExpression":
       return `(${toJSExpression(node.lhs)} + ${toJSExpression(node.rhs)})`;
   }

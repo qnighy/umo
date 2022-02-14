@@ -1,5 +1,13 @@
 
-export type Expression = AddExpression | IntegerLiteral | FloatingPointLiteral;
+export type Expression =
+  | VariableReference
+  | IntegerLiteral
+  | FloatingPointLiteral
+  | AddExpression;
+export type VariableReference = {
+  type: "VariableReference",
+  name: string,
+};
 export type AddExpression = {
   type: "AddExpression",
   lhs: Expression,
@@ -42,6 +50,8 @@ class Parser {
       return { type: "IntegerLiteral", value: BigInt(this.tokens[this.pos++]) };
     } else if (/^\d+\.\d+$/.test(this.tokens[this.pos])) {
       return { type: "FloatingPointLiteral", value: Number(this.tokens[this.pos++]) };
+    } else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this.tokens[this.pos])) {
+      return { type: "VariableReference", name: this.tokens[this.pos++] };
     } else {
       throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected Expression)`);
     }

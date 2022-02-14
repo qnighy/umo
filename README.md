@@ -45,6 +45,7 @@ Note on types:
 ## Types
 
 - Primitive types: `int`, `f64`, ... (only `int` and `f64` are implemented now)
+- Placeholder type called `Ambiguous` (`Ambiguous<Lo, Up>`) ... corresponds with `any` in TS.
 - TBD
 
 ## Development
