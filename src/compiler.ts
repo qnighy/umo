@@ -1,9 +1,9 @@
-import { Expression, parse } from "./parser";
+import { Expression, parseExpression } from "./parser";
 import { typecheck } from "./typeck";
 
 // Not implemented yet
 export function compile(text: string): string {
-  const ast = parse(text);
+  const ast = parseExpression(text);
   typecheck(ast);
   return toJSExpression(ast);
 }

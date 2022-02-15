@@ -1,3 +1,9 @@
+export type Statement =
+  | ExpressionStatement;
+export type ExpressionStatement = {
+  type: "ExpressionStatement",
+  expression: Expression,
+};
 
 export type Expression =
   | VariableReference
@@ -34,7 +40,12 @@ export class ParseError extends Error {
   }
 }
 
-export function parse(text: string): Expression {
+export function parseStatements(text: string): Statement[] {
+  const tokens = tokenize(text);
+  return new Parser(tokens).parseFullStatements();
+}
+
+export function parseExpression(text: string): Expression {
   const tokens = tokenize(text);
   return new Parser(tokens).parseFullExpression();
 }
@@ -56,6 +67,23 @@ class Parser {
       throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected Expression)`);
     }
   }
+  private parseStatements(): Statement[] {
+    const stmts: Statement[] = [];
+    while(this.pos < this.tokens.length) {
+      stmts.push(this.parseStatement());
+    }
+    return stmts;
+  }
+  private parseStatement(): Statement {
+    const expr = this.parseExpression();
+    if (this.pos >= this.tokens.length) {
+      throw new ParseError("Unexpected EOF");
+    } else if (this.tokens[this.pos] !== ";") {
+      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected ;)`);
+    }
+    this.pos++;
+    return { type: "ExpressionStatement", expression: expr };
+  }
   private parseExpression(): Expression {
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF");
@@ -76,6 +104,11 @@ class Parser {
     if (this.pos < this.tokens.length) {
       throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected EOF)`);
     }
+  }
+  public parseFullStatements(): Statement[] {
+    const stmts = this.parseStatements();
+    this.parseEOF();
+    return stmts;
   }
   public parseFullExpression(): Expression {
     const expr = this.parseExpression();

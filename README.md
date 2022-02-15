@@ -42,6 +42,14 @@ Note on types:
 
 - Arithmetic operators: different types cannot be mixed together.
 
+## Statements
+
+### Expression statements
+
+Expression + `;` is an expression statement.
+
+(`;` may be auto-inserted in the future)
+
 ## Types
 
 - Primitive types: `int`, `f64`, ... (only `int` and `f64` are implemented now)

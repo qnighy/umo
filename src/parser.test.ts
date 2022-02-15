@@ -1,14 +1,14 @@
 import { describe, expect, it, xit } from "@jest/globals";
-import { Expression, parse, tokenize } from "./parser";
+import { Expression, parseExpression, parseStatements, Statement, tokenize } from "./parser";
 
-describe("parse", () => {
+describe("parseExpression", () => {
   it("parses binary 1 + 1", () => {
     const expected: Expression = {
       type: "AddExpression",
       lhs: { type: "IntegerLiteral", value: 1n },
       rhs: { type: "IntegerLiteral", value: 1n },
     };
-    expect(parse("1 + 1")).toEqual(expected);
+    expect(parseExpression("1 + 1")).toEqual(expected);
   });
 
   it("parses ternary 1 + 2 + 3", () => {
@@ -21,7 +21,7 @@ describe("parse", () => {
       },
       rhs: { type: "IntegerLiteral", value: 3n },
     };
-    expect(parse("1 + 2 + 3")).toEqual(expected);
+    expect(parseExpression("1 + 2 + 3")).toEqual(expected);
   });
 
   xit("parses parentheses", () => {
@@ -34,7 +34,7 @@ describe("parse", () => {
         rhs: { type: "IntegerLiteral", value: 3n },
       },
     };
-    expect(parse("1 + (2 + 3)")).toEqual(expected);
+    expect(parseExpression("1 + (2 + 3)")).toEqual(expected);
   });
 
   it("parses floating-point number", () => {
@@ -43,7 +43,7 @@ describe("parse", () => {
       lhs: { type: "FloatingPointLiteral", value: 1 },
       rhs: { type: "FloatingPointLiteral", value: 1.25 },
     };
-    expect(parse("1.0 + 1.25")).toEqual(expected);
+    expect(parseExpression("1.0 + 1.25")).toEqual(expected);
   });
 
   it("parses identifiers", () => {
@@ -58,19 +58,58 @@ describe("parse", () => {
         name: "bar",
       },
     };
-    expect(parse("foo + bar")).toEqual(expected);
+    expect(parseExpression("foo + bar")).toEqual(expected);
   });
 
   it("errors on early EOF", () => {
-    expect(() => parse("")).toThrow(/Unexpected EOF/);
+    expect(() => parseExpression("")).toThrow(/Unexpected EOF/);
   });
 
   it("errors on initial-position unknown token", () => {
-    expect(() => parse("\\")).toThrow(/Unexpected token/);
+    expect(() => parseExpression("\\")).toThrow(/Unexpected token/);
   });
 
   it("errors on mid-position unknown token", () => {
-    expect(() => parse("1 \\")).toThrow(/Unexpected token/);
+    expect(() => parseExpression("1 \\")).toThrow(/Unexpected token/);
+  });
+});
+
+describe("parseStatements", () => {
+  it("parses an empty text", () => {
+    expect(parseStatements("")).toEqual([]);
+  });
+
+  it("parses an almost-empty text", () => {
+    expect(parseStatements("\n \n")).toEqual([]);
+  });
+
+  it("parses a single expression statement", () => {
+    const expected: Statement[] = [
+      {
+        type: "ExpressionStatement",
+        expression: {
+          type: "AddExpression",
+          lhs: {
+            type: "IntegerLiteral",
+            value: 1n,
+          },
+          rhs: {
+            type: "IntegerLiteral",
+            value: 1n,
+          },
+        }
+      }
+    ];
+    expect(parseStatements("1 + 1;")).toEqual(expected);
+  });
+
+  // May change to auto-insert semicolons
+  it("errors on missing semicolon", () => {
+    expect(() => parseStatements("1 + 1")).toThrow(/Unexpected EOF/);
+  });
+
+  it("errors on an invalid token", () => {
+    expect(() => parseStatements("1 + 1#")).toThrow(/Unexpected token: #/);
   });
 });
 
