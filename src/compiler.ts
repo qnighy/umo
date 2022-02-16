@@ -1,11 +1,22 @@
-import { Expression, parseExpression } from "./parser";
+import { Expression, parseStatements, Statement } from "./parser";
 import { typecheck } from "./typeck";
 
 // Not implemented yet
 export function compile(text: string): string {
-  const ast = parseExpression(text);
+  const ast = parseStatements(text);
   typecheck(ast);
-  return toJSExpression(ast);
+  return toJSStatements(ast);
+}
+
+function toJSStatements(statements: Statement[]): string {
+  return statements.map(toJSStatement).join("");
+}
+
+function toJSStatement(stmt: Statement): string {
+  switch (stmt.type) {
+    case "ExpressionStatement":
+      return `${toJSExpression(stmt.expression)};\n`;
+  }
 }
 
 function toJSExpression(node: Expression): string {

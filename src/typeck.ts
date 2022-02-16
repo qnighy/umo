@@ -1,4 +1,4 @@
-import { Expression } from "./parser";
+import { Expression, Statement } from "./parser";
 
 export type Type = BuiltinType | AmbiguousType;
 export type BuiltinType = {
@@ -21,8 +21,18 @@ export class TypeCheckerError extends Error {
   }
 }
 
-export function typecheck(ast: Expression) {
-  getType(ast);
+export function typecheck(ast: Statement[]) {
+  for (const stmt of ast) {
+    checkStatement(stmt);
+  }
+}
+
+function checkStatement(stmt: Statement) {
+  switch (stmt.type) {
+    case "ExpressionStatement":
+      getType(stmt.expression);
+      break;
+  }
 }
 
 function getType(ast: Expression): Type {

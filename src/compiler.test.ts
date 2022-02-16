@@ -7,11 +7,11 @@ import { TypeCheckerError } from "./typeck";
 
 describe("compile", () => {
   it("returns a string", () => {
-    expect(typeof compile("1 + 1")).toBe("string");
+    expect(typeof compile("1 + 1;")).toBe("string");
   });
 
   it("Compiles a text to JS", () => {
-    expect(compile("1 + 1")).toBe("(1n + 1n)");
+    expect(compile("1 + 1;")).toBe("(1n + 1n);\n");
   });
 
   it("errors on parse error", () => {
