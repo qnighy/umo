@@ -72,6 +72,11 @@ describe("parseExpression", () => {
   it("errors on mid-position unknown token", () => {
     expect(() => parseExpression("1 \\")).toThrow(/Unexpected token/);
   });
+
+  it("errors on keywords", () => {
+    expect(() => parseExpression("let")).toThrow(/Unexpected token/);
+    expect(() => parseExpression("1 + let")).toThrow(/Unexpected token/);
+  });
 });
 
 describe("parseStatements", () => {
@@ -106,10 +111,70 @@ describe("parseStatements", () => {
   // May change to auto-insert semicolons
   it("errors on missing semicolon", () => {
     expect(() => parseStatements("1 + 1")).toThrow(/Unexpected EOF/);
+    expect(() => parseStatements("let x = 1 + 1")).toThrow(/Unexpected EOF/);
   });
 
   it("errors on an invalid token", () => {
     expect(() => parseStatements("1 + 1#")).toThrow(/Unexpected token: #/);
+    expect(() => parseStatements("let x = 1 + 1#")).toThrow(/Unexpected token: #/);
+    expect(() => parseStatements("let x 1 + 1")).toThrow(/Unexpected token: 1/);
+    expect(() => parseStatements("let")).toThrow(/Unexpected EOF/);
+    expect(() => parseStatements("let let = 1;")).toThrow(/Unexpected token: let/);
+    expect(() => parseStatements("let [] = 1;")).toThrow(/Unexpected token: \[/);
+  });
+
+  it("parses let statements", () => {
+    const expected: Statement[] = [
+      {
+        type: "LetStatement",
+        lhs: "x",
+        rhs: {
+          type: "AddExpression",
+          lhs: {
+            type: "IntegerLiteral",
+            value: 1n,
+          },
+          rhs: {
+            type: "IntegerLiteral",
+            value: 2n,
+          },
+        },
+      },
+      {
+        type: "LetStatement",
+        lhs: "y",
+        rhs: {
+          type: "AddExpression",
+          lhs: {
+            type: "VariableReference",
+            name: "x",
+          },
+          rhs: {
+            type: "VariableReference",
+            name: "x",
+          },
+        },
+      },
+      {
+        type: "ExpressionStatement",
+        expression: {
+          type: "AddExpression",
+          lhs: {
+            type: "VariableReference",
+            name: "y",
+          },
+          rhs: {
+            type: "VariableReference",
+            name: "y",
+          },
+        },
+      },
+    ];
+    expect(parseStatements(`
+      let x = 1 + 2;
+      let y = x + x;
+      y + y;
+    `)).toEqual(expected);
   });
 });
 

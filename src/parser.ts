@@ -1,8 +1,14 @@
 export type Statement =
-  | ExpressionStatement;
+  | ExpressionStatement
+  | LetStatement;
 export type ExpressionStatement = {
   type: "ExpressionStatement",
   expression: Expression,
+};
+export type LetStatement = {
+  type: "LetStatement",
+  lhs: string,
+  rhs: Expression,
 };
 
 export type Expression =
@@ -50,6 +56,8 @@ export function parseExpression(text: string): Expression {
   return new Parser(tokens).parseFullExpression();
 }
 
+const KEYWORDS = ["let"];
+
 class Parser {
   private pos = 0;
   constructor(public readonly tokens: readonly string[]) {}
@@ -61,7 +69,7 @@ class Parser {
       return { type: "IntegerLiteral", value: BigInt(this.tokens[this.pos++]) };
     } else if (/^\d+\.\d+$/.test(this.tokens[this.pos])) {
       return { type: "FloatingPointLiteral", value: Number(this.tokens[this.pos++]) };
-    } else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this.tokens[this.pos])) {
+    } else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this.tokens[this.pos]) && !KEYWORDS.includes(this.tokens[this.pos])) {
       return { type: "VariableReference", name: this.tokens[this.pos++] };
     } else {
       throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected Expression)`);
@@ -75,6 +83,15 @@ class Parser {
     return stmts;
   }
   private parseStatement(): Statement {
+    if (this.pos >= this.tokens.length) {
+      throw new ParseError("Unexpected EOF");
+    }
+    if (this.tokens[this.pos] === "let") {
+      return this.parseLetStatement();
+    }
+    return this.parseExpressionStatement();
+  }
+  private parseExpressionStatement(): ExpressionStatement {
     const expr = this.parseExpression();
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF");
@@ -83,6 +100,40 @@ class Parser {
     }
     this.pos++;
     return { type: "ExpressionStatement", expression: expr };
+  }
+  private parseLetStatement(): LetStatement {
+    if (this.pos >= this.tokens.length) {
+      throw new ParseError("Unexpected EOF (expected let)");
+    } else if (this.tokens[this.pos] !== "let") {
+      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected let)`);
+    }
+    this.pos++;
+
+    if (this.pos >= this.tokens.length) {
+      throw new ParseError("Unexpected EOF (expected identifier)");
+    } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this.tokens[this.pos]) || KEYWORDS.includes(this.tokens[this.pos])) {
+      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected identifier)`);
+    }
+    const lhs = this.tokens[this.pos];
+    this.pos++;
+
+    if (this.pos >= this.tokens.length) {
+      throw new ParseError("Unexpected EOF (expected =)");
+    } else if (this.tokens[this.pos] !== "=") {
+      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected =)`);
+    }
+    this.pos++;
+
+    const rhs = this.parseExpression();
+
+    if (this.pos >= this.tokens.length) {
+      throw new ParseError("Unexpected EOF");
+    } else if (this.tokens[this.pos] !== ";") {
+      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected ;)`);
+    }
+    this.pos++;
+
+    return { type: "LetStatement", lhs, rhs };
   }
   private parseExpression(): Expression {
     if (this.pos >= this.tokens.length) {

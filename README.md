@@ -50,6 +50,14 @@ Expression + `;` is an expression statement.
 
 (`;` may be auto-inserted in the future)
 
+### Let statements
+
+```
+let <ident> = <expr>;
+```
+
+The identifiers are in scope after the statement.
+
 ## Types
 
 - Primitive types: `int`, `f64`, ... (only `int` and `f64` are implemented now)
