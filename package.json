@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "packageManager": "yarn@3.1.1",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "tsc": "tsc --build"
   },
   "devDependencies": {
     "@babel/core": "^7.17.2",
@@ -12,6 +13,7 @@
     "@jest/globals": "^27.5.1",
     "babel-jest": "^27.5.1",
     "jest": "^27.5.1",
-    "source-map-support": "^0.5.21"
+    "source-map-support": "^0.5.21",
+    "typescript": "^4.5.5"
   }
 }

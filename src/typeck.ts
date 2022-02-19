@@ -13,8 +13,8 @@ export class TypeCheckerError extends Error {
   constructor(message: string) {
     super(message);
 
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, this.constructor);
+    if ((Error as any).captureStackTrace) {
+      (Error as any).captureStackTrace(this, this.constructor);
     }
 
     this.name = this.constructor.name;
