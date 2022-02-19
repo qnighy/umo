@@ -5,6 +5,16 @@ import { compile } from "./compiler";
 import { ParseError } from "./parser";
 import { TypeCheckerError } from "./typeck";
 
+const updateSnapshot: "new" | "all" | "none" = (expect.getState() as any).snapshotState._updateSnapshot;
+
+function readFileOrNull(path: string): string | null {
+  if (fs.existsSync(path)) {
+    return fs.readFileSync(path, "utf8");
+  } else {
+    return null;
+  }
+}
+
 describe("compile", () => {
   it("returns a string", () => {
     expect(typeof compile("1 + 1;")).toBe("string");
@@ -35,9 +45,19 @@ describe("compile", () => {
           expect(() => compile(input)).toThrow(TypeCheckerError);
         });
       } else {
-        const expected = fs.readFileSync(path.resolve(testcaseDir, "output.js"), "utf8");
+        const expected = readFileOrNull(path.resolve(testcaseDir, "output.js"));
         it(testcaseName, () => {
-          expect(compile(input)).toBe(expected);
+          const output = compile(input);
+          if ((updateSnapshot === "new" && expected === null) || updateSnapshot === "all") {
+            if (output !== expected) {
+              fs.writeFileSync(path.resolve(testcaseDir, "output.js"), output, "utf8");
+              console.log(`Updated snapshot for ${testcaseName}`);
+            }
+          } else {
+            if (expected === null) console.error(`Missing snapshot for ${testcaseName}`);
+            expect(expected).not.toBeNull();
+            expect(output).toBe(expected);
+          }
         });
       }
     }
