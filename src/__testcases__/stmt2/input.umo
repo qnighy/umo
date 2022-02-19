@@ -1,0 +1,6 @@
+let foo = 1;
+let bar = foo + 1;
+let foo = 1.23;
+let baz = foo + 2.0;
+bar + 10;
+baz + 10.0;

@@ -22,30 +22,42 @@ export class TypeCheckerError extends Error {
 }
 
 export function typecheck(ast: Statement[]) {
+  const variableTypes = new Map<string, Type>();
   for (const stmt of ast) {
-    checkStatement(stmt);
+    checkStatement(variableTypes, stmt);
   }
 }
 
-function checkStatement(stmt: Statement) {
+function checkStatement(variableTypes: Map<string, Type>, stmt: Statement) {
   switch (stmt.type) {
     case "ExpressionStatement":
-      getType(stmt.expression);
+      getType(variableTypes, stmt.expression);
       break;
+    case "LetStatement":{
+      const rhsType = getType(variableTypes, stmt.rhs);
+      variableTypes.set(stmt.lhs, rhsType);
+      break;
+    }
   }
 }
 
-function getType(ast: Expression): Type {
+function getType(variableTypes: Map<string, Type>, ast: Expression): Type {
   switch (ast.type) {
     case "IntegerLiteral":
       return { type: "BuiltinType", kind: "int" };
     case "FloatingPointLiteral":
       return { type: "BuiltinType", kind: "f64" };
-    case "VariableReference":
-      return { type: "AmbiguousType" }; // TODO
+    case "VariableReference": {
+      const type = variableTypes.get(ast.name);
+      if (type) {
+        return type;
+      } else {
+        return { type: "AmbiguousType" }; // TODO
+      }
+    }
     case "AddExpression": {
-      const lhsType = getType(ast.lhs);
-      const rhsType = getType(ast.rhs);
+      const lhsType = getType(variableTypes, ast.lhs);
+      const rhsType = getType(variableTypes, ast.rhs);
       if (lhsType.type === "AmbiguousType" || rhsType.type === "AmbiguousType") {
         return { type: "AmbiguousType" };
       } else if (lhsType.type === "BuiltinType" && lhsType.kind === "int" && rhsType.type === "BuiltinType" && rhsType.kind === "int") {

@@ -16,6 +16,8 @@ function toJSStatement(stmt: Statement): string {
   switch (stmt.type) {
     case "ExpressionStatement":
       return `${toJSExpression(stmt.expression)};\n`;
+    case "LetStatement":
+      return `const ${stmt.lhs} = ${toJSExpression(stmt.rhs)};\n`;
   }
 }
 
