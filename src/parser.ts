@@ -82,6 +82,26 @@ export class ParseError extends Error {
 
     this.name = this.constructor.name;
   }
+
+  public toMessageWithCodeFrame(source: string): string {
+    const lines = source.split(/\r\n?|\n/);
+    const frameStart = Math.max(0, this.start.line - 2);
+    const frameEnd = Math.min(lines.length, this.end.line + 2 + 1);
+    const lineNumberWidth = Math.max(`${frameStart + 1}`.length, `${frameEnd}`.length);
+
+    let message = `${this.message}\n\n`;
+    for (let lineno = frameStart; lineno < frameEnd; lineno++) {
+      const line = lines[lineno];
+      message += `    ${`${lineno + 1}`.padStart(lineNumberWidth)} | ${line}\n`;
+      if (this.start.line <= lineno && lineno <= this.end.line) {
+        const startColumn = this.start.line === lineno ? this.start.column : 0;
+        const endColumn = Math.max(this.end.line === lineno ? this.end.column : line.length, startColumn + 1);
+        // TODO: take East Asian Width into account
+        message += `    ${" ".repeat(lineNumberWidth)} | ${" ".repeat(startColumn)}${"^".repeat(endColumn - startColumn)}\n`;
+      }
+    }
+    return message;
+  }
 }
 
 /**
