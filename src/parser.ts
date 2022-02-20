@@ -99,9 +99,6 @@ class Parser {
   private pos = 0;
   constructor(public readonly tokens: readonly Token[]) {}
   private parsePrimaryExpression(): Expression {
-    if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF (expected Expression)");
-    }
     const token = this.tokens[this.pos++];
     if (token.type === "IntegerLiteralToken") {
       return { type: "IntegerLiteral", value: token.value };
@@ -115,15 +112,12 @@ class Parser {
   }
   private parseStatements(): Statement[] {
     const stmts: Statement[] = [];
-    while(this.pos < this.tokens.length) {
+    while(this.tokens[this.pos].type !== "EOFToken") {
       stmts.push(this.parseStatement());
     }
     return stmts;
   }
   private parseStatement(): Statement {
-    if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF");
-    }
     if (isSymbolicToken(this.tokens[this.pos], ["let"])) {
       return this.parseLetStatement();
     }
@@ -131,42 +125,32 @@ class Parser {
   }
   private parseExpressionStatement(): ExpressionStatement {
     const expr = this.parseExpression();
-    if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF");
-    } else if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
+    if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
       throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`);
     }
     this.pos++;
     return { type: "ExpressionStatement", expression: expr };
   }
   private parseLetStatement(): LetStatement {
-    if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF (expected let)");
-    } else if (!isSymbolicToken(this.tokens[this.pos], ["let"])) {
+    if (!isSymbolicToken(this.tokens[this.pos], ["let"])) {
       throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected let)`);
     }
     this.pos++;
 
-    if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF (expected identifier)");
-    } else if (this.tokens[this.pos].type !== "IdentifierToken") {
+    if (this.tokens[this.pos].type !== "IdentifierToken") {
       throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected identifier)`);
     }
     const lhs = (this.tokens[this.pos] as IdentifierToken).name;
     this.pos++;
 
-    if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF (expected =)");
-    } else if (!isSymbolicToken(this.tokens[this.pos], ["="])) {
+    if (!isSymbolicToken(this.tokens[this.pos], ["="])) {
       throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected =)`);
     }
     this.pos++;
 
     const rhs = this.parseExpression();
 
-    if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF");
-    } else if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
+    if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
       throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`);
     }
     this.pos++;
@@ -174,11 +158,8 @@ class Parser {
     return { type: "LetStatement", lhs, rhs };
   }
   private parseExpression(): Expression {
-    if (this.pos >= this.tokens.length) {
-      throw new ParseError("Unexpected EOF");
-    }
     let expr = this.parsePrimaryExpression();
-    while (this.pos < this.tokens.length) {
+    while (true) {
       const token = this.tokens[this.pos];
       if (isSymbolicToken(token, ["+"])) {
         this.pos++;
@@ -190,7 +171,8 @@ class Parser {
     return expr;
   }
   private parseEOF() {
-    if (this.pos < this.tokens.length) {
+    const token = this.tokens[this.pos];
+    if (token.type !== "EOFToken") {
       throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected EOF)`);
     }
   }
@@ -206,7 +188,7 @@ class Parser {
   }
 }
 
-export type Token = IdentifierToken | IntegerLiteralToken | FloatingPointLiteralToken | SymbolicToken;
+export type Token = IdentifierToken | IntegerLiteralToken | FloatingPointLiteralToken | SymbolicToken | EOFToken;
 export type IdentifierToken = {
   type: "IdentifierToken";
   name: string;
@@ -225,9 +207,20 @@ export type FloatingPointLiteralToken = {
   start: Position;
   end: Position;
 };
+/**
+ * All tokens that don't carry additional data, like `+`, `;`, and `let`.
+ */
 export type SymbolicToken = {
   type: "SymbolicToken";
   value: string;
+  start: Position;
+  end: Position;
+};
+/**
+ * Virtual sentinel token to simplify the parser.
+ */
+export type EOFToken = {
+  type: "EOFToken";
   start: Position;
   end: Position;
 };
@@ -297,6 +290,11 @@ export function tokenize(text: string): Token[] {
       end: { line, column: i - lineStart },
     });
   }
+  tokens.push({
+    type: "EOFToken",
+    start: { line, column: i - lineStart },
+    end: { line, column: i - lineStart },
+  });
   return tokens;
 }
 
@@ -314,5 +312,7 @@ export function tokenName(token: Token): string {
       return `float literal ${token.value.toString()}`;
     case "SymbolicToken":
       return token.value;
+    case "EOFToken":
+      return "EOF";
   }
 }

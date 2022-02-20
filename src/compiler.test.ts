@@ -25,7 +25,7 @@ describe("compile", () => {
   });
 
   it("errors on parse error", () => {
-    expect(() => compile("1 +")).toThrow(/Unexpected EOF/);
+    expect(() => compile("1 +")).toThrow(/Unexpected token: EOF/);
   });
 
   describe("testcases", () => {

@@ -62,7 +62,7 @@ describe("parseExpression", () => {
   });
 
   it("errors on early EOF", () => {
-    expect(() => parseExpression("")).toThrow(/Unexpected EOF/);
+    expect(() => parseExpression("")).toThrow(/Unexpected token: EOF/);
   });
 
   it("errors on initial-position unknown token", () => {
@@ -110,15 +110,15 @@ describe("parseStatements", () => {
 
   // May change to auto-insert semicolons
   it("errors on missing semicolon", () => {
-    expect(() => parseStatements("1 + 1")).toThrow(/Unexpected EOF/);
-    expect(() => parseStatements("let x = 1 + 1")).toThrow(/Unexpected EOF/);
+    expect(() => parseStatements("1 + 1")).toThrow(/Unexpected token: EOF/);
+    expect(() => parseStatements("let x = 1 + 1")).toThrow(/Unexpected token: EOF/);
   });
 
   it("errors on an invalid token", () => {
     expect(() => parseStatements("1 + 1#")).toThrow(/Unexpected token: #/);
     expect(() => parseStatements("let x = 1 + 1#")).toThrow(/Unexpected token: #/);
     expect(() => parseStatements("let x 1 + 1")).toThrow(/Unexpected token: integer literal 1/);
-    expect(() => parseStatements("let")).toThrow(/Unexpected EOF/);
+    expect(() => parseStatements("let")).toThrow(/Unexpected token: EOF/);
     expect(() => parseStatements("let let = 1;")).toThrow(/Unexpected token: let/);
     expect(() => parseStatements("let [] = 1;")).toThrow(/Unexpected token: \[/);
   });
@@ -184,6 +184,7 @@ describe("tokenize", () => {
       { type: "IntegerLiteralToken", value: 1n, start: { line: 0, column: 0 }, end: { line: 0, column: 1 } },
       { type: "SymbolicToken", value: "+", start: { line: 0, column: 2 }, end: { line: 0, column: 3 } },
       { type: "IntegerLiteralToken", value: 1n, start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
+      { type: "EOFToken", start: { line: 0, column: 5 }, end: { line: 0, column: 5 } },
     ];
     expect(tokenize("1 + 1")).toEqual(expected);
   });
@@ -193,6 +194,7 @@ describe("tokenize", () => {
       { type: "IntegerLiteralToken", value: 123n, start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
       { type: "SymbolicToken", value: "+", start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
       { type: "IntegerLiteralToken", value: 456n, start: { line: 0, column: 6 }, end: { line: 0, column: 9 } },
+      { type: "EOFToken", start: { line: 0, column: 9 }, end: { line: 0, column: 9 } },
     ];
     expect(tokenize("123 + 456")).toEqual(expected);
   });
@@ -202,6 +204,7 @@ describe("tokenize", () => {
       { type: "FloatingPointLiteralToken", value: 123.04, start: { line: 0, column: 0 }, end: { line: 0, column: 7 } },
       { type: "SymbolicToken", value: "+", start: { line: 0, column: 8 }, end: { line: 0, column: 9 } },
       { type: "FloatingPointLiteralToken", value: 456.789, start: { line: 0, column: 10 }, end: { line: 0, column: 17 } },
+      { type: "EOFToken", start: { line: 0, column: 17 }, end: { line: 0, column: 17 } },
     ];
     expect(tokenize("123.040 + 456.789")).toEqual(expected);
   });
@@ -211,6 +214,7 @@ describe("tokenize", () => {
       { type: "IntegerLiteralToken", value: 123n, start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
       { type: "SymbolicToken", value: ".", start: { line: 0, column: 3 }, end: { line: 0, column: 4 } },
       { type: "IdentifierToken", name: "x", start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
+      { type: "EOFToken", start: { line: 0, column: 5 }, end: { line: 0, column: 5 } },
     ];
     expect(tokenize("123.x")).toEqual(expected);
   });
@@ -220,6 +224,7 @@ describe("tokenize", () => {
       { type: "IdentifierToken", name: "foo123", start: { line: 0, column: 0 }, end: { line: 0, column: 6 } },
       { type: "SymbolicToken", value: "+", start: { line: 0, column: 7 }, end: { line: 0, column: 8 } },
       { type: "IdentifierToken", name: "abc_def", start: { line: 0, column: 9 }, end: { line: 0, column: 16 } },
+      { type: "EOFToken", start: { line: 0, column: 16 }, end: { line: 0, column: 16 } },
     ];
     expect(tokenize("foo123 + abc_def")).toEqual(expected);
   });
@@ -228,6 +233,7 @@ describe("tokenize", () => {
     const expected: Token[] = [
       { type: "IntegerLiteralToken", value: 123n, start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
       { type: "IdentifierToken", name: "foo", start: { line: 0, column: 3 }, end: { line: 0, column: 6 } },
+      { type: "EOFToken", start: { line: 0, column: 6 }, end: { line: 0, column: 6 } },
     ];
     expect(tokenize("123foo")).toEqual(expected);
   });
@@ -239,6 +245,7 @@ describe("tokenize", () => {
       { "type": "IdentifierToken", "name": "bar", "start": { "column": 3, "line": 1 }, "end": { "column": 6, "line": 1 } },
       { "type": "SymbolicToken", "value": "+", "start": { "column": 0, "line": 2, }, "end": { "column": 1, "line": 2, } },
       { "type": "IdentifierToken", "name": "baz", "start": { "column": 3, "line": 2, }, "end": { "column": 6, "line": 2, } },
+      { type: "EOFToken", start: { line: 2, column: 6 }, end: { line: 2, column: 6 } },
     ];
     expect(tokenize(" foo\n  +bar\r\n+  baz")).toEqual(expected);
   });
