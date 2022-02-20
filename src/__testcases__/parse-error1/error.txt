@@ -1,1 +1,1 @@
-Unexpected token: EOF (expected Expression)
+2:1: Unexpected token: EOF (expected Expression)

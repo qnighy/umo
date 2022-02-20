@@ -66,8 +66,15 @@ export type FloatingPointLiteral = {
 };
 
 export class ParseError extends Error {
-  constructor(message: string) {
-    super(message);
+  originalMessage: string;
+  start: Position;
+  end: Position;
+  constructor(options: { start: Position, end: Position, message: string }) {
+    const { start, end, message } = options;
+    super(`${start.line + 1}:${start.column + 1}: ${message}`);
+    this.originalMessage = message;
+    this.start = start;
+    this.end = end;
 
     if ((Error as any).captureStackTrace) {
       (Error as any).captureStackTrace(this, this.constructor);
@@ -107,7 +114,11 @@ class Parser {
     } else if (token.type === "IdentifierToken") {
       return { type: "VariableReference", name: token.name };
     } else {
-      throw new ParseError(`Unexpected token: ${tokenName(token)} (expected Expression)`);
+      throw new ParseError({
+        start: token.start,
+        end: token.end,
+        message: `Unexpected token: ${tokenName(token)} (expected Expression)`,
+      });
     }
   }
   private parseStatements(): Statement[] {
@@ -126,32 +137,52 @@ class Parser {
   private parseExpressionStatement(): ExpressionStatement {
     const expr = this.parseExpression();
     if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
-      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`);
+      throw new ParseError({
+        start: this.tokens[this.pos].start,
+        end: this.tokens[this.pos].end,
+        message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`,
+      });
     }
     this.pos++;
     return { type: "ExpressionStatement", expression: expr };
   }
   private parseLetStatement(): LetStatement {
     if (!isSymbolicToken(this.tokens[this.pos], ["let"])) {
-      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected let)`);
+      throw new ParseError({
+        start: this.tokens[this.pos].start,
+        end: this.tokens[this.pos].end,
+        message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected let)`,
+      });
     }
     this.pos++;
 
     if (this.tokens[this.pos].type !== "IdentifierToken") {
-      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected identifier)`);
+      throw new ParseError({
+        start: this.tokens[this.pos].start,
+        end: this.tokens[this.pos].end,
+        message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected identifier)`,
+      });
     }
     const lhs = (this.tokens[this.pos] as IdentifierToken).name;
     this.pos++;
 
     if (!isSymbolicToken(this.tokens[this.pos], ["="])) {
-      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected =)`);
+      throw new ParseError({
+        start: this.tokens[this.pos].start,
+        end: this.tokens[this.pos].end,
+        message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected =)`,
+      });
     }
     this.pos++;
 
     const rhs = this.parseExpression();
 
     if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
-      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`);
+      throw new ParseError({
+        start: this.tokens[this.pos].start,
+        end: this.tokens[this.pos].end,
+        message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`,
+      });
     }
     this.pos++;
 
@@ -173,7 +204,11 @@ class Parser {
   private parseEOF() {
     const token = this.tokens[this.pos];
     if (token.type !== "EOFToken") {
-      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected EOF)`);
+      throw new ParseError({
+        start: token.start,
+        end: token.end,
+        message: `Unexpected token: ${this.tokens[this.pos]} (expected EOF)`,
+      });
     }
   }
   public parseFullStatements(): Statement[] {
