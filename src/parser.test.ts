@@ -181,53 +181,53 @@ describe("parseStatements", () => {
 describe("tokenize", () => {
   it("tokenizes a text", () => {
     const expected: Token[] = [
-      { type: "IntegerLiteralToken", value: 1n },
-      { type: "SymbolicToken", value: "+" },
-      { type: "IntegerLiteralToken", value: 1n },
+      { type: "IntegerLiteralToken", value: 1n, start: { line: 0, column: 0 }, end: { line: 0, column: 1 } },
+      { type: "SymbolicToken", value: "+", start: { line: 0, column: 2 }, end: { line: 0, column: 3 } },
+      { type: "IntegerLiteralToken", value: 1n, start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
     ];
     expect(tokenize("1 + 1")).toEqual(expected);
   });
 
   it("tokenizes a number", () => {
     const expected: Token[] = [
-      { type: "IntegerLiteralToken", value: 123n },
-      { type: "SymbolicToken", value: "+" },
-      { type: "IntegerLiteralToken", value: 456n },
+      { type: "IntegerLiteralToken", value: 123n, start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
+      { type: "SymbolicToken", value: "+", start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
+      { type: "IntegerLiteralToken", value: 456n, start: { line: 0, column: 6 }, end: { line: 0, column: 9 } },
     ];
     expect(tokenize("123 + 456")).toEqual(expected);
   });
 
   it("tokenizes a floating-point number", () => {
     const expected: Token[] = [
-      { type: "FloatingPointLiteralToken", value: 123.04 },
-      { type: "SymbolicToken", value: "+" },
-      { type: "FloatingPointLiteralToken", value: 456.789 },
+      { type: "FloatingPointLiteralToken", value: 123.04, start: { line: 0, column: 0 }, end: { line: 0, column: 7 } },
+      { type: "SymbolicToken", value: "+", start: { line: 0, column: 8 }, end: { line: 0, column: 9 } },
+      { type: "FloatingPointLiteralToken", value: 456.789, start: { line: 0, column: 10 }, end: { line: 0, column: 17 } },
     ];
     expect(tokenize("123.040 + 456.789")).toEqual(expected);
   });
 
   it("tokenizes a stray dot after integer", () => {
     const expected: Token[] = [
-      { type: "IntegerLiteralToken", value: 123n },
-      { type: "SymbolicToken", value: "." },
-      { type: "IdentifierToken", name: "x" },
+      { type: "IntegerLiteralToken", value: 123n, start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
+      { type: "SymbolicToken", value: ".", start: { line: 0, column: 3 }, end: { line: 0, column: 4 } },
+      { type: "IdentifierToken", name: "x", start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
     ];
     expect(tokenize("123.x")).toEqual(expected);
   });
 
   it("tokenizes an identifier", () => {
     const expected: Token[] = [
-      { type: "IdentifierToken", name: "foo123" },
-      { type: "SymbolicToken", value: "+" },
-      { type: "IdentifierToken", name: "abc_def" },
+      { type: "IdentifierToken", name: "foo123", start: { line: 0, column: 0 }, end: { line: 0, column: 6 } },
+      { type: "SymbolicToken", value: "+", start: { line: 0, column: 7 }, end: { line: 0, column: 8 } },
+      { type: "IdentifierToken", name: "abc_def", start: { line: 0, column: 9 }, end: { line: 0, column: 16 } },
     ];
     expect(tokenize("foo123 + abc_def")).toEqual(expected);
   });
 
   it("disallows identifiers starting with digits", () => {
     const expected: Token[] = [
-      { type: "IntegerLiteralToken", value: 123n },
-      { type: "IdentifierToken", name: "foo" },
+      { type: "IntegerLiteralToken", value: 123n, start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
+      { type: "IdentifierToken", name: "foo", start: { line: 0, column: 3 }, end: { line: 0, column: 6 } },
     ];
     expect(tokenize("123foo")).toEqual(expected);
   });

@@ -1,3 +1,14 @@
+export type Position = {
+  /**
+   * 0-based line number.
+   */
+  line: number;
+  /**
+   * 0-based column number in UTF-16 code units.
+   */
+  column: number;
+};
+
 export type Statement =
   | ExpressionStatement
   | LetStatement;
@@ -173,48 +184,92 @@ export type Token = IdentifierToken | IntegerLiteralToken | FloatingPointLiteral
 export type IdentifierToken = {
   type: "IdentifierToken";
   name: string;
+  start: Position;
+  end: Position;
 };
 export type IntegerLiteralToken = {
   type: "IntegerLiteralToken";
   value: bigint;
+  start: Position;
+  end: Position;
 };
 export type FloatingPointLiteralToken = {
   type: "FloatingPointLiteralToken";
   value: number;
+  start: Position;
+  end: Position;
 };
 export type SymbolicToken = {
   type: "SymbolicToken";
   value: string;
+  start: Position;
+  end: Position;
 };
 
 export function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
+  let line = 0;
+  let lineStart = 0;
   while (i < text.length) {
     const start = i;
     const c = text[i++];
+    if (c === "\n" || c === "\r") {
+      if (c === "\r" && i < text.length && text[i] === "\n") {
+        i++;
+      }
+      line++;
+      lineStart = i;
+      continue;
+    }
     if (/\s/.test(c)) continue;
+    const startLoc = { line, column: start - lineStart };
     if (/\d/.test(c)) {
       while (i < text.length && /\d/.test(text[i])) i++;
       if (i + 1 < text.length && text[i] === "." && /\d/.test(text[i + 1])) {
         i++;
         while (i < text.length && /\d/.test(text[i])) i++;
-        tokens.push({ type: "FloatingPointLiteralToken", value: Number(text.substring(start, i)) });
+        tokens.push({
+          type: "FloatingPointLiteralToken",
+          value: Number(text.substring(start, i)),
+          start: startLoc,
+          end: { line, column: i - lineStart },
+        });
         continue;
       }
-      tokens.push({ type: "IntegerLiteralToken", value: BigInt(text.substring(start, i)) });
+      tokens.push({
+        type: "IntegerLiteralToken",
+        value: BigInt(text.substring(start, i)),
+        start: startLoc,
+        end: { line, column: i - lineStart },
+      });
       continue;
     } else if (/[a-zA-Z_]/.test(c)) {
       while (i < text.length && /[a-zA-Z_0-9]/.test(text[i])) i++;
       const name = text.substring(start, i);
       if (KEYWORDS.includes(name)) {
-        tokens.push({ type: "SymbolicToken", value: name });
+        tokens.push({
+          type: "SymbolicToken",
+          value: name,
+          start: startLoc,
+          end: { line, column: i - lineStart },
+        });
       } else {
-        tokens.push({ type: "IdentifierToken", name });
+        tokens.push({
+          type: "IdentifierToken",
+          name,
+          start: startLoc,
+          end: { line, column: i - lineStart },
+        });
       }
       continue;
     }
-    tokens.push({ type: "SymbolicToken", value: c });
+    tokens.push({
+      type: "SymbolicToken",
+      value: c,
+      start: startLoc,
+      end: { line, column: i - lineStart },
+    });
   }
   return tokens;
 }
