@@ -12,10 +12,16 @@ export type Position = {
 export type Statement =
   | ExpressionStatement
   | LetStatement;
+/**
+ * Expression statement `1 + 1;`.
+ */
 export type ExpressionStatement = {
   type: "ExpressionStatement",
   expression: Expression,
 };
+/**
+ * Let statement `let x = 1 + 1;`.
+ */
 export type LetStatement = {
   type: "LetStatement",
   lhs: string,
@@ -27,19 +33,33 @@ export type Expression =
   | IntegerLiteral
   | FloatingPointLiteral
   | AddExpression;
+/**
+ * `x` as in `x + 1`.
+ */
 export type VariableReference = {
   type: "VariableReference",
   name: string,
 };
+/**
+ * Binary addition `1 + 1`.
+ */
 export type AddExpression = {
   type: "AddExpression",
   lhs: Expression,
   rhs: Expression,
 };
+/**
+ * Integer literals like `123`. No negative numbers.
+ * Currently decimals only.
+ */
 export type IntegerLiteral = {
   type: "IntegerLiteral",
   value: bigint,
 };
+/**
+ * Floating point literals like `1.23`. No negative numbers.
+ * Currently decimals only and no exponent notation.
+ */
 export type FloatingPointLiteral = {
   type: "FloatingPointLiteral",
   value: number,
@@ -57,11 +77,17 @@ export class ParseError extends Error {
   }
 }
 
+/**
+ * Parses the text as a sequence of statements.
+ */
 export function parseStatements(text: string): Statement[] {
   const tokens = tokenize(text);
   return new Parser(tokens).parseFullStatements();
 }
 
+/**
+ * Parses the text as a single expression.
+ */
 export function parseExpression(text: string): Expression {
   const tokens = tokenize(text);
   return new Parser(tokens).parseFullExpression();
