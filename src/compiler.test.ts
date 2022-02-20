@@ -47,7 +47,7 @@ describe("compile", () => {
           }
           expect(error).toBeInstanceOf(ParseError);
 
-          const output = error instanceof ParseError ? error.toMessageWithCodeFrame(input) : "";
+          const output = error instanceof ParseError ? error.toFullMessageWithCodeFrame(input) : "";
           if ((updateSnapshot === "new" && expected === null) || updateSnapshot === "all") {
             if (output !== expected) {
               fs.writeFileSync(path.resolve(testcaseDir, "error.txt"), output, "utf8");

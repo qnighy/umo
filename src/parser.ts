@@ -11,7 +11,8 @@ export type Position = {
 
 export type Statement =
   | ExpressionStatement
-  | LetStatement;
+  | LetStatement
+  | ParseErroredStatement;
 /**
  * Expression statement `1 + 1;`.
  */
@@ -27,12 +28,19 @@ export type LetStatement = {
   lhs: string,
   rhs: Expression,
 };
+/**
+ * Placeholder node for when we encountered a parse error.
+ */
+export type ParseErroredStatement = {
+  type: "ParseErroredStatement",
+};
 
 export type Expression =
   | VariableReference
   | IntegerLiteral
   | FloatingPointLiteral
-  | AddExpression;
+  | AddExpression
+  | ParseErroredExpression;
 /**
  * `x` as in `x + 1`.
  */
@@ -64,8 +72,37 @@ export type FloatingPointLiteral = {
   type: "FloatingPointLiteral",
   value: number,
 };
+/**
+ * Placeholder node for when we encountered a parse error.
+ */
+export type ParseErroredExpression = {
+  type: "ParseErroredExpression",
+};
 
 export class ParseError extends Error {
+  public subErrors: readonly SingleParseError[];
+  constructor(subErrors: readonly SingleParseError[]) {
+    super(subErrors[0].message);
+    this.subErrors = subErrors;
+
+    // TODO: copy stack traces from subErrors[0]
+    if ((Error as any).captureStackTrace) {
+      (Error as any).captureStackTrace(this, this.constructor);
+    }
+
+    this.name = this.constructor.name;
+  }
+
+  public toFullMessageWithCodeFrame(source: string): string {
+    let messages = "";
+    for (const subError of this.subErrors) {
+      messages += subError.toMessageWithCodeFrame(source) + "\n";
+    }
+    return messages;
+  }
+}
+
+export class SingleParseError extends Error {
   originalMessage: string;
   start: Position;
   end: Position;
@@ -108,37 +145,70 @@ export class ParseError extends Error {
  * Parses the text as a sequence of statements.
  */
 export function parseStatements(text: string): Statement[] {
+  const { statements, error } = parseStatementsWithErrors(text);
+  if (error) throw error;
+  return statements;
+}
+
+/**
+ * Parses the text as a sequence of statements.
+ * This function returns a partial AST even if there are parse errors.
+ */
+export function parseStatementsWithErrors(text: string): { statements: Statement[], error: ParseError | undefined } {
   const tokens = tokenize(text);
-  return new Parser(tokens).parseFullStatements();
+  const parser = new Parser(tokens);
+  const statements = parser.parseFullStatements();
+  const error = parser.getError();
+  return { statements, error };
 }
 
 /**
  * Parses the text as a single expression.
  */
 export function parseExpression(text: string): Expression {
+  const { expression, error } = parseExpressionWithErrors(text);
+  if (error) throw error;
+  return expression;
+}
+
+/**
+ * Parses the text as a single expression.
+ * This function returns a partial AST even if there are parse errors.
+ */
+export function parseExpressionWithErrors(text: string): { expression: Expression, error: ParseError | undefined } {
   const tokens = tokenize(text);
-  return new Parser(tokens).parseFullExpression();
+  const parser = new Parser(tokens);
+  const expression = parser.parseFullExpression();
+  const error = parser.getError();
+  return { expression, error };
 }
 
 const KEYWORDS = ["let"];
 
 class Parser {
   private pos = 0;
+  private errors: SingleParseError[] = [];
   constructor(public readonly tokens: readonly Token[]) {}
   private parsePrimaryExpression(): Expression {
-    const token = this.tokens[this.pos++];
+    const token = this.tokens[this.pos];
     if (token.type === "IntegerLiteralToken") {
+      this.pos++;
       return { type: "IntegerLiteral", value: token.value };
     } else if (token.type === "FloatingPointLiteralToken") {
+      this.pos++;
       return { type: "FloatingPointLiteral", value: token.value };
     } else if (token.type === "IdentifierToken") {
+      this.pos++;
       return { type: "VariableReference", name: token.name };
     } else {
-      throw new ParseError({
+      this.errors.push(new SingleParseError({
         start: token.start,
         end: token.end,
         message: `Unexpected token: ${tokenName(token)} (expected Expression)`,
-      });
+      }));
+      // TODO: better fallback strategy
+      if (token.type !== "EOFToken" && !isSymbolicToken(token, [",", ";", ")", "}", "]"])) this.pos++;
+      return { type: "ParseErroredExpression" };
     }
   }
   private parseStatements(): Statement[] {
@@ -155,56 +225,77 @@ class Parser {
     return this.parseExpressionStatement();
   }
   private parseExpressionStatement(): ExpressionStatement {
+    const initPos = this.pos;
     const expr = this.parseExpression();
     if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
-      throw new ParseError({
+      this.errors.push(new SingleParseError({
         start: this.tokens[this.pos].start,
         end: this.tokens[this.pos].end,
         message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`,
-      });
+      }));
+      if (initPos === this.pos && this.tokens[this.pos].type !== "EOFToken") this.pos++;
+      return { type: "ExpressionStatement", expression: expr };
     }
     this.pos++;
     return { type: "ExpressionStatement", expression: expr };
   }
   private parseLetStatement(): LetStatement {
+    let hasError = false;
     if (!isSymbolicToken(this.tokens[this.pos], ["let"])) {
-      throw new ParseError({
+      this.errors.push(new SingleParseError({
         start: this.tokens[this.pos].start,
         end: this.tokens[this.pos].end,
         message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected let)`,
-      });
+      }));
+      if (this.tokens[this.pos].type !== "EOFToken") this.pos++;
+      return { type: "LetStatement", lhs: "", rhs: { type: "ParseErroredExpression" } };
     }
     this.pos++;
 
-    if (this.tokens[this.pos].type !== "IdentifierToken") {
-      throw new ParseError({
+    let lhs: string;
+    if (this.tokens[this.pos].type === "IdentifierToken") {
+      lhs = (this.tokens[this.pos] as IdentifierToken).name;
+      this.pos++;
+    } else {
+      this.errors.push(new SingleParseError({
         start: this.tokens[this.pos].start,
         end: this.tokens[this.pos].end,
         message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected identifier)`,
-      });
+      }));
+      lhs = "";
+      hasError = true;
     }
-    const lhs = (this.tokens[this.pos] as IdentifierToken).name;
-    this.pos++;
 
-    if (!isSymbolicToken(this.tokens[this.pos], ["="])) {
-      throw new ParseError({
+    if (isSymbolicToken(this.tokens[this.pos], ["="])) {
+      this.pos++;
+    } else if (!hasError) {
+      this.errors.push(new SingleParseError({
         start: this.tokens[this.pos].start,
         end: this.tokens[this.pos].end,
         message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected =)`,
-      });
+      }));
+      hasError = true;
     }
-    this.pos++;
 
     const rhs = this.parseExpression();
 
-    if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
-      throw new ParseError({
-        start: this.tokens[this.pos].start,
-        end: this.tokens[this.pos].end,
-        message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`,
-      });
+    if (isSymbolicToken(this.tokens[this.pos], [";"])) {
+      this.pos++;
+    } else {
+      if (!hasError) {
+        this.errors.push(new SingleParseError({
+          start: this.tokens[this.pos].start,
+          end: this.tokens[this.pos].end,
+          message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`,
+        }));
+        hasError = true;
+      }
+      // Recover towards a statement boundary or something of the sort.
+      while (this.tokens[this.pos].type !== "EOFToken" && !isSymbolicToken(this.tokens[this.pos], [";", "}", ")", "]"])) {
+        this.pos++;
+      }
+      if (this.tokens[this.pos].type !== "EOFToken") this.pos++;
     }
-    this.pos++;
 
     return { type: "LetStatement", lhs, rhs };
   }
@@ -224,12 +315,17 @@ class Parser {
   private parseEOF() {
     const token = this.tokens[this.pos];
     if (token.type !== "EOFToken") {
-      throw new ParseError({
+      this.errors.push(new SingleParseError({
         start: token.start,
         end: token.end,
         message: `Unexpected token: ${this.tokens[this.pos]} (expected EOF)`,
-      });
+      }));
+      this.pos++;
+      return;
     }
+  }
+  public getError(): ParseError | undefined {
+    return this.errors.length > 0 ? new ParseError(this.errors) : undefined;
   }
   public parseFullStatements(): Statement[] {
     const stmts = this.parseStatements();

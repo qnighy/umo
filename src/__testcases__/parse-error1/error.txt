@@ -3,3 +3,10 @@
     1 | 1 +
     2 | 
       | ^
+
+2:1: Unexpected token: EOF (expected ;)
+
+    1 | 1 +
+    2 | 
+      | ^
+

@@ -38,6 +38,9 @@ function checkStatement(variableTypes: Map<string, Type>, stmt: Statement) {
       variableTypes.set(stmt.lhs, rhsType);
       break;
     }
+    case "ParseErroredStatement":
+      // Do nothing
+      break;
   }
 }
 
@@ -68,6 +71,9 @@ function getType(variableTypes: Map<string, Type>, ast: Expression): Type {
         // TODO: more useful error message
         throw new TypeCheckerError("Invalid types in addition");
       }
+    }
+    case "ParseErroredExpression": {
+      return { type: "AmbiguousType" };
     }
   }
 }

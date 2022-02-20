@@ -18,6 +18,8 @@ function toJSStatement(stmt: Statement): string {
       return `${toJSExpression(stmt.expression)};\n`;
     case "LetStatement":
       return `const ${stmt.lhs} = ${toJSExpression(stmt.rhs)};\n`;
+    case "ParseErroredStatement":
+      throw new Error("Cannot compile sources with parse error");
   }
 }
 
@@ -31,5 +33,7 @@ function toJSExpression(node: Expression): string {
       return `${node.name}`;
     case "AddExpression":
       return `(${toJSExpression(node.lhs)} + ${toJSExpression(node.rhs)})`;
+    case "ParseErroredExpression":
+      throw new Error("Cannot compile sources with parse error");
   }
 }
