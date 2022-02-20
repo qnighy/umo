@@ -1,0 +1,194 @@
+3:5: Unexpected token: ( (expected Expression)
+
+    1 | 1 + 1;
+    2 | 1 + 2 + 3;
+    3 | 1 + (2 + 3);
+      |     ^
+    4 | 1.0 + 1.25;
+    5 | foo + bar;
+
+3:6: Unexpected token: integer literal 2 (expected ;)
+
+    1 | 1 + 1;
+    2 | 1 + 2 + 3;
+    3 | 1 + (2 + 3);
+      |      ^
+    4 | 1.0 + 1.25;
+    5 | foo + bar;
+
+3:11: Unexpected token: ) (expected ;)
+
+    1 | 1 + 1;
+    2 | 1 + 2 + 3;
+    3 | 1 + (2 + 3);
+      |           ^
+    4 | 1.0 + 1.25;
+    5 | foo + bar;
+
+3:11: Unexpected token: ) (expected Expression)
+
+    1 | 1 + 1;
+    2 | 1 + 2 + 3;
+    3 | 1 + (2 + 3);
+      |           ^
+    4 | 1.0 + 1.25;
+    5 | foo + bar;
+
+3:11: Unexpected token: ) (expected ;)
+
+    1 | 1 + 1;
+    2 | 1 + 2 + 3;
+    3 | 1 + (2 + 3);
+      |           ^
+    4 | 1.0 + 1.25;
+    5 | foo + bar;
+
+3:12: Unexpected token: ; (expected Expression)
+
+    1 | 1 + 1;
+    2 | 1 + 2 + 3;
+    3 | 1 + (2 + 3);
+      |            ^
+    4 | 1.0 + 1.25;
+    5 | foo + bar;
+
+6:1: Unexpected token: \ (expected Expression)
+
+    4 | 1.0 + 1.25;
+    5 | foo + bar;
+    6 | \ ;
+      | ^
+    7 | 1 \ ;
+    8 | let;
+
+7:3: Unexpected token: \ (expected ;)
+
+    5 | foo + bar;
+    6 | \ ;
+    7 | 1 \ ;
+      |   ^
+    8 | let;
+    9 | 1 + let;
+
+7:3: Unexpected token: \ (expected Expression)
+
+    5 | foo + bar;
+    6 | \ ;
+    7 | 1 \ ;
+      |   ^
+    8 | let;
+    9 | 1 + let;
+
+8:4: Unexpected token: ; (expected identifier)
+
+     6 | \ ;
+     7 | 1 \ ;
+     8 | let;
+       |    ^
+     9 | 1 + let;
+    10 | let x = 1 +;
+
+8:4: Unexpected token: ; (expected Expression)
+
+     6 | \ ;
+     7 | 1 \ ;
+     8 | let;
+       |    ^
+     9 | 1 + let;
+    10 | let x = 1 +;
+
+9:5: Unexpected token: let (expected Expression)
+
+     7 | 1 \ ;
+     8 | let;
+     9 | 1 + let;
+       |     ^^^
+    10 | let x = 1 +;
+    11 | let x;
+
+10:12: Unexpected token: ; (expected Expression)
+
+     8 | let;
+     9 | 1 + let;
+    10 | let x = 1 +;
+       |            ^
+    11 | let x;
+    12 | let x 1 + 2;
+
+11:6: Unexpected token: ; (expected =)
+
+     9 | 1 + let;
+    10 | let x = 1 +;
+    11 | let x;
+       |      ^
+    12 | let x 1 + 2;
+    13 | let let = 1;
+
+11:6: Unexpected token: ; (expected Expression)
+
+     9 | 1 + let;
+    10 | let x = 1 +;
+    11 | let x;
+       |      ^
+    12 | let x 1 + 2;
+    13 | let let = 1;
+
+12:7: Unexpected token: integer literal 1 (expected =)
+
+    10 | let x = 1 +;
+    11 | let x;
+    12 | let x 1 + 2;
+       |       ^
+    13 | let let = 1;
+    14 | let [] = 1;
+
+13:5: Unexpected token: let (expected identifier)
+
+    11 | let x;
+    12 | let x 1 + 2;
+    13 | let let = 1;
+       |     ^^^
+    14 | let [] = 1;
+    15 | 
+
+13:5: Unexpected token: let (expected Expression)
+
+    11 | let x;
+    12 | let x 1 + 2;
+    13 | let let = 1;
+       |     ^^^
+    14 | let [] = 1;
+    15 | 
+
+14:5: Unexpected token: [ (expected identifier)
+
+    12 | let x 1 + 2;
+    13 | let let = 1;
+    14 | let [] = 1;
+       |     ^
+    15 | 
+
+14:5: Unexpected token: [ (expected Expression)
+
+    12 | let x 1 + 2;
+    13 | let let = 1;
+    14 | let [] = 1;
+       |     ^
+    15 | 
+
+14:8: Unexpected token: = (expected Expression)
+
+    12 | let x 1 + 2;
+    13 | let let = 1;
+    14 | let [] = 1;
+       |        ^
+    15 | 
+
+14:10: Unexpected token: integer literal 1 (expected ;)
+
+    12 | let x 1 + 2;
+    13 | let let = 1;
+    14 | let [] = 1;
+       |          ^
+    15 | 
+
