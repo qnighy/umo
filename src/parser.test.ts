@@ -231,4 +231,15 @@ describe("tokenize", () => {
     ];
     expect(tokenize("123foo")).toEqual(expected);
   });
+
+  it("takes whitespaces into account in positions", () => {
+    const expected: Token[] = [
+      { "type": "IdentifierToken", "name": "foo", "start": { "column": 1, "line": 0 }, "end": { "column": 4, "line": 0 } },
+      { "type": "SymbolicToken", "value": "+", "start": { "column": 2, "line": 1 }, "end": { "column": 3, "line": 1 } },
+      { "type": "IdentifierToken", "name": "bar", "start": { "column": 3, "line": 1 }, "end": { "column": 6, "line": 1 } },
+      { "type": "SymbolicToken", "value": "+", "start": { "column": 0, "line": 2, }, "end": { "column": 1, "line": 2, } },
+      { "type": "IdentifierToken", "name": "baz", "start": { "column": 3, "line": 2, }, "end": { "column": 6, "line": 2, } },
+    ];
+    expect(tokenize(" foo\n  +bar\r\n+  baz")).toEqual(expected);
+  });
 });
