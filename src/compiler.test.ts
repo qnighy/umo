@@ -38,7 +38,26 @@ describe("compile", () => {
       const it = config.pending ? xit : realIt;
       if (config.parseError) {
         it(testcaseName, () => {
-          expect(() => compile(input)).toThrow(ParseError);
+          const expected = readFileOrNull(path.resolve(testcaseDir, "error.txt"));
+          let error: unknown = undefined;
+          try {
+            compile(input);
+          } catch(e) {
+            error = e;
+          }
+          expect(error).toBeInstanceOf(ParseError);
+
+          const output = error instanceof ParseError ? error.message : "";
+          if ((updateSnapshot === "new" && expected === null) || updateSnapshot === "all") {
+            if (output !== expected) {
+              fs.writeFileSync(path.resolve(testcaseDir, "error.txt"), output, "utf8");
+              console.log(`Updated snapshot for ${testcaseName}`);
+            }
+          } else {
+            if (expected === null) console.error(`Missing snapshot for ${testcaseName}`);
+            expect(expected).not.toBeNull();
+            expect(output).toBe(expected);
+          }
         });
       } else if (config.typeCheckError) {
         it(testcaseName, () => {
