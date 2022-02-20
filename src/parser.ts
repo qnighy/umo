@@ -60,19 +60,20 @@ const KEYWORDS = ["let"];
 
 class Parser {
   private pos = 0;
-  constructor(public readonly tokens: readonly string[]) {}
+  constructor(public readonly tokens: readonly Token[]) {}
   private parsePrimaryExpression(): Expression {
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF (expected Expression)");
     }
-    if (/^\d+$/.test(this.tokens[this.pos])) {
-      return { type: "IntegerLiteral", value: BigInt(this.tokens[this.pos++]) };
-    } else if (/^\d+\.\d+$/.test(this.tokens[this.pos])) {
-      return { type: "FloatingPointLiteral", value: Number(this.tokens[this.pos++]) };
-    } else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this.tokens[this.pos]) && !KEYWORDS.includes(this.tokens[this.pos])) {
-      return { type: "VariableReference", name: this.tokens[this.pos++] };
+    const token = this.tokens[this.pos++];
+    if (token.type === "IntegerLiteralToken") {
+      return { type: "IntegerLiteral", value: token.value };
+    } else if (token.type === "FloatingPointLiteralToken") {
+      return { type: "FloatingPointLiteral", value: token.value };
+    } else if (token.type === "IdentifierToken") {
+      return { type: "VariableReference", name: token.name };
     } else {
-      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected Expression)`);
+      throw new ParseError(`Unexpected token: ${tokenName(token)} (expected Expression)`);
     }
   }
   private parseStatements(): Statement[] {
@@ -86,7 +87,7 @@ class Parser {
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF");
     }
-    if (this.tokens[this.pos] === "let") {
+    if (isSymbolicToken(this.tokens[this.pos], ["let"])) {
       return this.parseLetStatement();
     }
     return this.parseExpressionStatement();
@@ -95,8 +96,8 @@ class Parser {
     const expr = this.parseExpression();
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF");
-    } else if (this.tokens[this.pos] !== ";") {
-      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected ;)`);
+    } else if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
+      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`);
     }
     this.pos++;
     return { type: "ExpressionStatement", expression: expr };
@@ -104,23 +105,23 @@ class Parser {
   private parseLetStatement(): LetStatement {
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF (expected let)");
-    } else if (this.tokens[this.pos] !== "let") {
-      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected let)`);
+    } else if (!isSymbolicToken(this.tokens[this.pos], ["let"])) {
+      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected let)`);
     }
     this.pos++;
 
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF (expected identifier)");
-    } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(this.tokens[this.pos]) || KEYWORDS.includes(this.tokens[this.pos])) {
-      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected identifier)`);
+    } else if (this.tokens[this.pos].type !== "IdentifierToken") {
+      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected identifier)`);
     }
-    const lhs = this.tokens[this.pos];
+    const lhs = (this.tokens[this.pos] as IdentifierToken).name;
     this.pos++;
 
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF (expected =)");
-    } else if (this.tokens[this.pos] !== "=") {
-      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected =)`);
+    } else if (!isSymbolicToken(this.tokens[this.pos], ["="])) {
+      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected =)`);
     }
     this.pos++;
 
@@ -128,8 +129,8 @@ class Parser {
 
     if (this.pos >= this.tokens.length) {
       throw new ParseError("Unexpected EOF");
-    } else if (this.tokens[this.pos] !== ";") {
-      throw new ParseError(`Unexpected token: ${this.tokens[this.pos]} (expected ;)`);
+    } else if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
+      throw new ParseError(`Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`);
     }
     this.pos++;
 
@@ -142,7 +143,7 @@ class Parser {
     let expr = this.parsePrimaryExpression();
     while (this.pos < this.tokens.length) {
       const token = this.tokens[this.pos];
-      if (token === "+") {
+      if (isSymbolicToken(token, ["+"])) {
         this.pos++;
         expr = { type: "AddExpression", lhs: expr, rhs: this.parsePrimaryExpression() };
       } else {
@@ -168,8 +169,26 @@ class Parser {
   }
 }
 
-export function tokenize(text: string): string[] {
-  const tokens: string[] = [];
+export type Token = IdentifierToken | IntegerLiteralToken | FloatingPointLiteralToken | SymbolicToken;
+export type IdentifierToken = {
+  type: "IdentifierToken";
+  name: string;
+};
+export type IntegerLiteralToken = {
+  type: "IntegerLiteralToken";
+  value: bigint;
+};
+export type FloatingPointLiteralToken = {
+  type: "FloatingPointLiteralToken";
+  value: number;
+};
+export type SymbolicToken = {
+  type: "SymbolicToken";
+  value: string;
+};
+
+export function tokenize(text: string): Token[] {
+  const tokens: Token[] = [];
   let i = 0;
   while (i < text.length) {
     const start = i;
@@ -180,15 +199,39 @@ export function tokenize(text: string): string[] {
       if (i + 1 < text.length && text[i] === "." && /\d/.test(text[i + 1])) {
         i++;
         while (i < text.length && /\d/.test(text[i])) i++;
+        tokens.push({ type: "FloatingPointLiteralToken", value: Number(text.substring(start, i)) });
+        continue;
       }
-      tokens.push(text.slice(start, i));
+      tokens.push({ type: "IntegerLiteralToken", value: BigInt(text.substring(start, i)) });
       continue;
     } else if (/[a-zA-Z_]/.test(c)) {
       while (i < text.length && /[a-zA-Z_0-9]/.test(text[i])) i++;
-      tokens.push(text.slice(start, i));
+      const name = text.substring(start, i);
+      if (KEYWORDS.includes(name)) {
+        tokens.push({ type: "SymbolicToken", value: name });
+      } else {
+        tokens.push({ type: "IdentifierToken", name });
+      }
       continue;
     }
-    tokens.push(c);
+    tokens.push({ type: "SymbolicToken", value: c });
   }
   return tokens;
+}
+
+export function isSymbolicToken(token: Token, symbols: readonly string[]): token is SymbolicToken {
+  return token.type === "SymbolicToken" && symbols.includes(token.value);
+}
+
+export function tokenName(token: Token): string {
+  switch (token.type) {
+    case "IdentifierToken":
+      return `identifier ${token.name}`;
+    case "IntegerLiteralToken":
+      return `integer literal ${token.value.toString()}`;
+    case "FloatingPointLiteralToken":
+      return `float literal ${token.value.toString()}`;
+    case "SymbolicToken":
+      return token.value;
+  }
 }

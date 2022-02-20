@@ -1,5 +1,5 @@
 import { describe, expect, it, xit } from "@jest/globals";
-import { Expression, parseExpression, parseStatements, Statement, tokenize } from "./parser";
+import { Expression, parseExpression, parseStatements, Statement, Token, tokenize } from "./parser";
 
 describe("parseExpression", () => {
   it("parses binary 1 + 1", () => {
@@ -117,7 +117,7 @@ describe("parseStatements", () => {
   it("errors on an invalid token", () => {
     expect(() => parseStatements("1 + 1#")).toThrow(/Unexpected token: #/);
     expect(() => parseStatements("let x = 1 + 1#")).toThrow(/Unexpected token: #/);
-    expect(() => parseStatements("let x 1 + 1")).toThrow(/Unexpected token: 1/);
+    expect(() => parseStatements("let x 1 + 1")).toThrow(/Unexpected token: integer literal 1/);
     expect(() => parseStatements("let")).toThrow(/Unexpected EOF/);
     expect(() => parseStatements("let let = 1;")).toThrow(/Unexpected token: let/);
     expect(() => parseStatements("let [] = 1;")).toThrow(/Unexpected token: \[/);
@@ -180,26 +180,55 @@ describe("parseStatements", () => {
 
 describe("tokenize", () => {
   it("tokenizes a text", () => {
-    expect(tokenize("1 + 1")).toEqual(["1", "+", "1"]);
+    const expected: Token[] = [
+      { type: "IntegerLiteralToken", value: 1n },
+      { type: "SymbolicToken", value: "+" },
+      { type: "IntegerLiteralToken", value: 1n },
+    ];
+    expect(tokenize("1 + 1")).toEqual(expected);
   });
 
   it("tokenizes a number", () => {
-    expect(tokenize("123 + 456")).toEqual(["123", "+", "456"]);
+    const expected: Token[] = [
+      { type: "IntegerLiteralToken", value: 123n },
+      { type: "SymbolicToken", value: "+" },
+      { type: "IntegerLiteralToken", value: 456n },
+    ];
+    expect(tokenize("123 + 456")).toEqual(expected);
   });
 
   it("tokenizes a floating-point number", () => {
-    expect(tokenize("123.040 + 456.789")).toEqual(["123.040", "+", "456.789"]);
+    const expected: Token[] = [
+      { type: "FloatingPointLiteralToken", value: 123.04 },
+      { type: "SymbolicToken", value: "+" },
+      { type: "FloatingPointLiteralToken", value: 456.789 },
+    ];
+    expect(tokenize("123.040 + 456.789")).toEqual(expected);
   });
 
   it("tokenizes a stray dot after integer", () => {
-    expect(tokenize("123.x")).toEqual(["123", ".", "x"]);
+    const expected: Token[] = [
+      { type: "IntegerLiteralToken", value: 123n },
+      { type: "SymbolicToken", value: "." },
+      { type: "IdentifierToken", name: "x" },
+    ];
+    expect(tokenize("123.x")).toEqual(expected);
   });
 
   it("tokenizes an identifier", () => {
-    expect(tokenize("foo123 + abc_def")).toEqual(["foo123", "+", "abc_def"]);
+    const expected: Token[] = [
+      { type: "IdentifierToken", name: "foo123" },
+      { type: "SymbolicToken", value: "+" },
+      { type: "IdentifierToken", name: "abc_def" },
+    ];
+    expect(tokenize("foo123 + abc_def")).toEqual(expected);
   });
 
   it("disallows identifiers starting with digits", () => {
-    expect(tokenize("123foo")).toEqual(["123", "foo"]);
+    const expected: Token[] = [
+      { type: "IntegerLiteralToken", value: 123n },
+      { type: "IdentifierToken", name: "foo" },
+    ];
+    expect(tokenize("123foo")).toEqual(expected);
   });
 });
