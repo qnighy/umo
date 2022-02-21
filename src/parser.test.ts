@@ -5,8 +5,17 @@ describe("parseExpression", () => {
   it("parses binary 1 + 1", () => {
     const expected: Expression = {
       type: "AddExpression",
-      lhs: { type: "IntegerLiteral", value: 1n },
-      rhs: { type: "IntegerLiteral", value: 1n },
+      lhs: {
+        type: "IntegerLiteral",
+        value: 1n,
+        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } },
+      },
+      rhs: {
+        type: "IntegerLiteral",
+        value: 1n,
+        range: { start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
+      },
+      range: { start: { line: 0, column: 0 }, end: { line: 0, column: 5 } },
     };
     expect(parseExpression("1 + 1")).toEqual(expected);
   });
@@ -16,10 +25,24 @@ describe("parseExpression", () => {
       type: "AddExpression",
       lhs: {
         type: "AddExpression",
-        lhs: { type: "IntegerLiteral", value: 1n },
-        rhs: { type: "IntegerLiteral", value: 2n },
+        lhs: {
+          type: "IntegerLiteral",
+          value: 1n,
+          range: { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } },
+        },
+        rhs: {
+          type: "IntegerLiteral",
+          value: 2n,
+          range: { start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
+        },
+        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 5 } },
       },
-      rhs: { type: "IntegerLiteral", value: 3n },
+      rhs: {
+        type: "IntegerLiteral",
+        value: 3n,
+        range: { start: { line: 0, column: 8 }, end: { line: 0, column: 9 } },
+      },
+      range: { start: { line: 0, column: 0 }, end: { line: 0, column: 9 } },
     };
     expect(parseExpression("1 + 2 + 3")).toEqual(expected);
   });
@@ -27,12 +50,26 @@ describe("parseExpression", () => {
   xit("parses parentheses", () => {
     const expected: Expression = {
       type: "AddExpression",
-      lhs: { type: "IntegerLiteral", value: 1n },
+      lhs: {
+        type: "IntegerLiteral",
+        value: 1n,
+        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } },
+      },
       rhs: {
         type: "AddExpression",
-        lhs: { type: "IntegerLiteral", value: 2n },
-        rhs: { type: "IntegerLiteral", value: 3n },
+        lhs: {
+          type: "IntegerLiteral",
+          value: 2n,
+          range: { start: { line: 0, column: 5 }, end: { line: 0, column: 6 } },
+        },
+        rhs: {
+          type: "IntegerLiteral",
+          value: 3n,
+          range: { start: { line: 0, column: 9 }, end: { line: 0, column: 10 } },
+        },
+        range: { start: { line: 0, column: 4 }, end: { line: 0, column: 11 } },
       },
+      range: { start: { line: 0, column: 0 }, end: { line: 0, column: 11 } },
     };
     expect(parseExpression("1 + (2 + 3)")).toEqual(expected);
   });
@@ -40,8 +77,17 @@ describe("parseExpression", () => {
   it("parses floating-point number", () => {
     const expected: Expression = {
       type: "AddExpression",
-      lhs: { type: "FloatingPointLiteral", value: 1 },
-      rhs: { type: "FloatingPointLiteral", value: 1.25 },
+      lhs: {
+        type: "FloatingPointLiteral",
+        value: 1,
+        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
+      },
+      rhs: {
+        type: "FloatingPointLiteral",
+        value: 1.25,
+        range: { start: { line: 0, column: 6 }, end: { line: 0, column: 10 } },
+      },
+      range: { start: { line: 0, column: 0 }, end: { line: 0, column: 10 } },
     };
     expect(parseExpression("1.0 + 1.25")).toEqual(expected);
   });
@@ -52,11 +98,14 @@ describe("parseExpression", () => {
       lhs: {
         type: "VariableReference",
         name: "foo",
+        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
       },
       rhs: {
         type: "VariableReference",
         name: "bar",
+        range: { start: { line: 0, column: 6 }, end: { line: 0, column: 9 } },
       },
+      range: { start: { line: 0, column: 0 }, end: { line: 0, column: 9 } },
     };
     expect(parseExpression("foo + bar")).toEqual(expected);
   });
@@ -97,12 +146,16 @@ describe("parseStatements", () => {
           lhs: {
             type: "IntegerLiteral",
             value: 1n,
+            range: { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } },
           },
           rhs: {
             type: "IntegerLiteral",
             value: 1n,
+            range: { start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
           },
-        }
+          range: { start: { line: 0, column: 0 }, end: { line: 0, column: 5 } },
+        },
+        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 6 } },
       }
     ];
     expect(parseStatements("1 + 1;")).toEqual(expected);
@@ -133,12 +186,16 @@ describe("parseStatements", () => {
           lhs: {
             type: "IntegerLiteral",
             value: 1n,
+            range: { start: { line: 0, column: 8 }, end: { line: 0, column: 9 } },
           },
           rhs: {
             type: "IntegerLiteral",
             value: 2n,
+            range: { start: { line: 0, column: 12 }, end: { line: 0, column: 13 } },
           },
+          range: { start: { line: 0, column: 8 }, end: { line: 0, column: 13 } },
         },
+        range: { start: { line: 0, column: 0 }, end: { line: 0, column: 14 } },
       },
       {
         type: "LetStatement",
@@ -148,12 +205,16 @@ describe("parseStatements", () => {
           lhs: {
             type: "VariableReference",
             name: "x",
+            range: { start: { line: 1, column: 8 }, end: { line: 1, column: 9 } },
           },
           rhs: {
             type: "VariableReference",
             name: "x",
+            range: { start: { line: 1, column: 12 }, end: { line: 1, column: 13 } },
           },
+          range: { start: { line: 1, column: 8 }, end: { line: 1, column: 13 } },
         },
+        range: { start: { line: 1, column: 0 }, end: { line: 1, column: 14 } },
       },
       {
         type: "ExpressionStatement",
@@ -162,19 +223,23 @@ describe("parseStatements", () => {
           lhs: {
             type: "VariableReference",
             name: "y",
+            range: { start: { line: 2, column: 0 }, end: { line: 2, column: 1 } },
           },
           rhs: {
             type: "VariableReference",
             name: "y",
+            range: { start: { line: 2, column: 4 }, end: { line: 2, column: 5 } },
           },
+          range: { start: { line: 2, column: 0 }, end: { line: 2, column: 5 } },
         },
+        range: { start: { line: 2, column: 0 }, end: { line: 2, column: 6 } },
       },
     ];
-    expect(parseStatements(`
+    expect(parseStatements(dedentText(`
       let x = 1 + 2;
       let y = x + x;
       y + y;
-    `)).toEqual(expected);
+    `))).toEqual(expected);
   });
 });
 
@@ -250,3 +315,12 @@ describe("tokenize", () => {
     expect(tokenize(" foo\n  +bar\r\n+  baz")).toEqual(expected);
   });
 });
+
+function dedentText(text: string): string {
+  const lines = text.split(/\r\n?|\n/);
+  if (lines.length === 0 || lines[0] !== "") throw new Error("The first line must be empty");
+  if (!/^\s*$/.test(lines[lines.length - 1])) throw new Error("The last line must be whitespace-only");
+  const mainLines = lines.slice(1, lines.length - 1);
+  const indent = Math.min(...mainLines.map((line) => /^\s*/.exec(line)![0].length));
+  return mainLines.map((line) => `${line.slice(indent)}\n`).join("");
+}

@@ -9,6 +9,11 @@ export type Position = {
   column: number;
 };
 
+export type Range = {
+  start: Position;
+  end: Position;
+};
+
 export type Statement =
   | ExpressionStatement
   | LetStatement
@@ -19,6 +24,7 @@ export type Statement =
 export type ExpressionStatement = {
   type: "ExpressionStatement",
   expression: Expression,
+  range: Range;
 };
 /**
  * Let statement `let x = 1 + 1;`.
@@ -27,12 +33,14 @@ export type LetStatement = {
   type: "LetStatement",
   lhs: string,
   rhs: Expression,
+  range: Range;
 };
 /**
  * Placeholder node for when we encountered a parse error.
  */
 export type ParseErroredStatement = {
   type: "ParseErroredStatement",
+  range: Range;
 };
 
 export type Expression =
@@ -47,6 +55,7 @@ export type Expression =
 export type VariableReference = {
   type: "VariableReference",
   name: string,
+  range: Range;
 };
 /**
  * Binary addition `1 + 1`.
@@ -55,6 +64,7 @@ export type AddExpression = {
   type: "AddExpression",
   lhs: Expression,
   rhs: Expression,
+  range: Range;
 };
 /**
  * Integer literals like `123`. No negative numbers.
@@ -63,6 +73,7 @@ export type AddExpression = {
 export type IntegerLiteral = {
   type: "IntegerLiteral",
   value: bigint,
+  range: Range;
 };
 /**
  * Floating point literals like `1.23`. No negative numbers.
@@ -71,12 +82,14 @@ export type IntegerLiteral = {
 export type FloatingPointLiteral = {
   type: "FloatingPointLiteral",
   value: number,
+  range: Range;
 };
 /**
  * Placeholder node for when we encountered a parse error.
  */
 export type ParseErroredExpression = {
   type: "ParseErroredExpression",
+  range: Range;
 };
 
 export class ParseError extends Error {
@@ -193,13 +206,25 @@ class Parser {
     const token = this.tokens[this.pos];
     if (token.type === "IntegerLiteralToken") {
       this.pos++;
-      return { type: "IntegerLiteral", value: token.value };
+      return {
+        type: "IntegerLiteral",
+        value: token.value,
+        range: { start: token.start, end: token.end },
+      };
     } else if (token.type === "FloatingPointLiteralToken") {
       this.pos++;
-      return { type: "FloatingPointLiteral", value: token.value };
+      return {
+        type: "FloatingPointLiteral",
+        value: token.value,
+        range: { start: token.start, end: token.end },
+      };
     } else if (token.type === "IdentifierToken") {
       this.pos++;
-      return { type: "VariableReference", name: token.name };
+      return {
+        type: "VariableReference",
+        name: token.name,
+        range: { start: token.start, end: token.end },
+      };
     } else {
       this.errors.push(new SingleParseError({
         start: token.start,
@@ -208,7 +233,10 @@ class Parser {
       }));
       // TODO: better fallback strategy
       if (token.type !== "EOFToken" && !isSymbolicToken(token, [",", ";", ")", "}", "]"])) this.pos++;
-      return { type: "ParseErroredExpression" };
+      return {
+        type: "ParseErroredExpression",
+        range: { start: token.start, end: token.end },
+      };
     }
   }
   private parseStatements(): Statement[] {
@@ -226,6 +254,7 @@ class Parser {
   }
   private parseExpressionStatement(): ExpressionStatement {
     const initPos = this.pos;
+    const start = this.tokens[this.pos].start;
     const expr = this.parseExpression();
     if (!isSymbolicToken(this.tokens[this.pos], [";"])) {
       this.errors.push(new SingleParseError({
@@ -234,12 +263,21 @@ class Parser {
         message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ;)`,
       }));
       if (initPos === this.pos && this.tokens[this.pos].type !== "EOFToken") this.pos++;
-      return { type: "ExpressionStatement", expression: expr };
+      return {
+        type: "ExpressionStatement",
+        expression: expr,
+        range: { start, end: this.tokens[this.pos - 1].end },
+      };
     }
     this.pos++;
-    return { type: "ExpressionStatement", expression: expr };
+    return {
+      type: "ExpressionStatement",
+      expression: expr,
+      range: { start, end: this.tokens[this.pos - 1].end },
+    };
   }
   private parseLetStatement(): LetStatement {
+    const start = this.tokens[this.pos].start;
     let hasError = false;
     if (!isSymbolicToken(this.tokens[this.pos], ["let"])) {
       this.errors.push(new SingleParseError({
@@ -247,8 +285,17 @@ class Parser {
         end: this.tokens[this.pos].end,
         message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected let)`,
       }));
+      const end = this.tokens[this.pos].end;
       if (this.tokens[this.pos].type !== "EOFToken") this.pos++;
-      return { type: "LetStatement", lhs: "", rhs: { type: "ParseErroredExpression" } };
+      return {
+        type: "LetStatement",
+        lhs: "",
+        rhs: {
+          type: "ParseErroredExpression",
+          range: { start, end },
+        },
+        range: { start, end },
+      };
     }
     this.pos++;
 
@@ -297,15 +344,27 @@ class Parser {
       if (this.tokens[this.pos].type !== "EOFToken") this.pos++;
     }
 
-    return { type: "LetStatement", lhs, rhs };
+    return {
+      type: "LetStatement",
+      lhs,
+      rhs,
+      range: { start, end: this.tokens[this.pos - 1].end },
+    };
   }
   private parseExpression(): Expression {
+    const start = this.tokens[this.pos].start;
     let expr = this.parsePrimaryExpression();
     while (true) {
       const token = this.tokens[this.pos];
       if (isSymbolicToken(token, ["+"])) {
         this.pos++;
-        expr = { type: "AddExpression", lhs: expr, rhs: this.parsePrimaryExpression() };
+        const rhs = this.parsePrimaryExpression();
+        expr = {
+          type: "AddExpression",
+          lhs: expr,
+          rhs,
+          range: { start, end: rhs.range.end },
+        };
       } else {
         break;
       }
