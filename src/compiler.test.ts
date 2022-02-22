@@ -2,8 +2,8 @@ import path from "path";
 import fs from "fs";
 import { describe, expect, it, it as realIt, xit } from "@jest/globals";
 import { compile } from "./compiler";
-import { ParseError } from "./parser";
-import { TypeCheckerError } from "./typeck";
+import { ParseError, parseStatements } from "./parser";
+import { typecheck, TypeCheckerError } from "./typeck";
 
 const updateSnapshot: "new" | "all" | "none" = (expect.getState() as any).snapshotState._updateSnapshot;
 
@@ -61,7 +61,27 @@ describe("compile", () => {
         });
       } else if (config.typeCheckError) {
         it(testcaseName, () => {
-          expect(() => compile(input)).toThrow(TypeCheckerError);
+          const ast = parseStatements(input);
+          const expected = readFileOrNull(path.resolve(testcaseDir, "error.txt"));
+          let error: unknown = undefined;
+          try {
+            typecheck(ast);
+          } catch(e) {
+            error = e;
+          }
+          expect(error).toBeInstanceOf(TypeCheckerError);
+
+          const output = error instanceof TypeCheckerError ? error.toMessageWithCodeFrame(input) : "";
+          if ((updateSnapshot === "new" && expected === null) || updateSnapshot === "all") {
+            if (output !== expected) {
+              fs.writeFileSync(path.resolve(testcaseDir, "error.txt"), output, "utf8");
+              console.log(`Updated snapshot for ${testcaseName}`);
+            }
+          } else {
+            if (expected === null) console.error(`Missing snapshot for ${testcaseName}`);
+            expect(expected).not.toBeNull();
+            expect(output).toBe(expected);
+          }
         });
       } else {
         const expected = readFileOrNull(path.resolve(testcaseDir, "output.js"));

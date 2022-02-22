@@ -1,4 +1,4 @@
-import { Expression, Statement } from "./parser";
+import { Expression, Range, renderCodeFrame, Statement } from "./parser";
 
 export type Type = BuiltinType | AmbiguousType;
 export type BuiltinType = {
@@ -10,14 +10,20 @@ export type AmbiguousType = {
 };
 
 export class TypeCheckerError extends Error {
-  constructor(message: string) {
-    super(message);
+  range: Range;
+  constructor(options: { range: Range, message: string }) {
+    super(options.message);
+    this.range = options.range;
 
     if ((Error as any).captureStackTrace) {
       (Error as any).captureStackTrace(this, this.constructor);
     }
 
     this.name = this.constructor.name;
+  }
+
+  public toMessageWithCodeFrame(source: string): string {
+    return `${this.message}\n\n${renderCodeFrame(source, this.range)}`;
   }
 }
 
@@ -69,7 +75,7 @@ function getType(variableTypes: Map<string, Type>, ast: Expression): Type {
         return { type: "BuiltinType", kind: "f64" };
       } else {
         // TODO: more useful error message
-        throw new TypeCheckerError("Invalid types in addition");
+        throw new TypeCheckerError({ message: "Invalid types in addition", range: ast.range });
       }
     }
     case "ParseErroredExpression": {
