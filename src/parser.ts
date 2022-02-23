@@ -456,6 +456,14 @@ export function tokenize(text: string): Token[] {
       continue;
     }
     if (/\s/.test(c)) continue;
+    if (c === "/" && i < text.length && text[i] === "/") {
+      // Line comment.
+      i++;
+      while (i < text.length && text[i] !== "\n") {
+        i++;
+      }
+      continue;
+    }
     const startLoc = { line, column: start - lineStart };
     if (/\d/.test(c)) {
       while (i < text.length && /\d/.test(text[i])) i++;

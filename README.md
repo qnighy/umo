@@ -9,6 +9,10 @@
 
 ## Expressions
 
+### Comment (not an expression though)
+
+Currently `// comment` is implemented
+
 ### Primary
 
 - Parentheses: `1 + (2 + 3)` (not implemented)

@@ -314,6 +314,27 @@ describe("tokenize", () => {
     ];
     expect(tokenize(" foo\n  +bar\r\n+  baz")).toEqual(expected);
   });
+
+  it("skips a comment", () => {
+    const expected: Token[] = [
+      { type: "SymbolicToken", value: "let", start: { line: 0, column: 0 }, end: { line: 0, column: 3 } },
+      { type: "IdentifierToken", name: "x", start: { line: 0, column: 4 }, end: { line: 0, column: 5 } },
+      { type: "SymbolicToken", value: "=", start: { line: 0, column: 6 }, end: { line: 0, column: 7 } },
+      { type: "IntegerLiteralToken", value: 1n, start: { line: 0, column: 8 }, end: { line: 0, column: 9 } },
+      { type: "SymbolicToken", value: ";", start: { line: 0, column: 9 }, end: { line: 0, column: 10 } },
+      { type: "SymbolicToken", value: "let", start: { line: 2, column: 0 }, end: { line: 2, column: 3 } },
+      { type: "IdentifierToken", name: "y", start: { line: 2, column: 4 }, end: { line: 2, column: 5 } },
+      { type: "SymbolicToken", value: "=", start: { line: 2, column: 6 }, end: { line: 2, column: 7 } },
+      { type: "IntegerLiteralToken", value: 2n, start: { line: 2, column: 8 }, end: { line: 2, column: 9 } },
+      { type: "SymbolicToken", value: ";", start: { line: 2, column: 9 }, end: { line: 2, column: 10 } },
+      { type: "EOFToken", start: { line: 3, column: 0 }, end: { line: 3, column: 0 } },
+    ];
+    expect(tokenize(dedentText(`
+      let x = 1;
+      // comment
+      let y = 2;
+    `))).toEqual(expected);
+  });
 });
 
 function dedentText(text: string): string {
