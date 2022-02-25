@@ -47,7 +47,7 @@ describe("parseExpression", () => {
     expect(parseExpression("1 + 2 + 3")).toEqual(expected);
   });
 
-  xit("parses parentheses", () => {
+  it("parses parentheses", () => {
     const expected: Expression = {
       type: "AddExpression",
       lhs: {
@@ -56,16 +56,20 @@ describe("parseExpression", () => {
         range: { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } },
       },
       rhs: {
-        type: "AddExpression",
-        lhs: {
-          type: "IntegerLiteral",
-          value: 2n,
-          range: { start: { line: 0, column: 5 }, end: { line: 0, column: 6 } },
-        },
-        rhs: {
-          type: "IntegerLiteral",
-          value: 3n,
-          range: { start: { line: 0, column: 9 }, end: { line: 0, column: 10 } },
+        type: "ParenthesizedExpression",
+        expression: {
+          type: "AddExpression",
+          lhs: {
+            type: "IntegerLiteral",
+            value: 2n,
+            range: { start: { line: 0, column: 5 }, end: { line: 0, column: 6 } },
+          },
+          rhs: {
+            type: "IntegerLiteral",
+            value: 3n,
+            range: { start: { line: 0, column: 9 }, end: { line: 0, column: 10 } },
+          },
+          range: { start: { line: 0, column: 5 }, end: { line: 0, column: 10 } },
         },
         range: { start: { line: 0, column: 4 }, end: { line: 0, column: 11 } },
       },

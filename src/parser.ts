@@ -44,11 +44,17 @@ export type ParseErroredStatement = {
 };
 
 export type Expression =
+  | ParenthesizedExpression
   | VariableReference
   | IntegerLiteral
   | FloatingPointLiteral
   | AddExpression
   | ParseErroredExpression;
+export type ParenthesizedExpression = {
+  type: "ParenthesizedExpression",
+  expression: Expression,
+  range: Range;
+};
 /**
  * `x` as in `x + 1`.
  */
@@ -228,6 +234,32 @@ class Parser {
         type: "VariableReference",
         name: token.name,
         range: { start: token.start, end: token.end },
+      };
+    } else if (isSymbolicToken(token, ["("])) {
+      this.pos++;
+      const expression = this.parseExpression();
+      if (isSymbolicToken(this.tokens[this.pos], [")"])) {
+        this.pos++;
+      } else {
+        this.errors.push(new SingleParseError({
+          start: this.tokens[this.pos].start,
+          end: this.tokens[this.pos].end,
+          message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ")")`,
+        }));
+        while (this.tokens[this.pos].type !== "EOFToken" && !isSymbolicToken(this.tokens[this.pos], [",", ";", ")", "}", "]"])) {
+          this.pos++;
+        }
+        // "(x +)" => recover after ")"
+        // "(x;" => recover before ";"
+        // "(x]" => recover before "]"
+        if (isSymbolicToken(this.tokens[this.pos], [")"])) {
+          this.pos++;
+        }
+      }
+      return {
+        type: "ParenthesizedExpression",
+        expression,
+        range: { start: token.start, end: this.tokens[this.pos - 1].end },
       };
     } else {
       this.errors.push(new SingleParseError({

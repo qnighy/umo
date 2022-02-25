@@ -25,6 +25,8 @@ function toJSStatement(stmt: Statement): string {
 
 function toJSExpression(node: Expression): string {
   switch (node.type) {
+    case "ParenthesizedExpression":
+      return toJSExpression(node.expression);
     case "IntegerLiteral":
       return `${node.value}n`;
     case "FloatingPointLiteral":

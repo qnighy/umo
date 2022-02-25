@@ -82,6 +82,8 @@ function checkStatement(errors: SingleTypeCheckerError[], variableTypes: Map<str
 
 function getType(errors: SingleTypeCheckerError[], variableTypes: Map<string, Type>, ast: Expression): Type {
   switch (ast.type) {
+    case "ParenthesizedExpression":
+      return getType(errors, variableTypes, ast.expression);
     case "IntegerLiteral":
       return { type: "BuiltinType", kind: "int" };
     case "FloatingPointLiteral":

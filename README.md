@@ -15,7 +15,7 @@ Currently `// comment` is implemented
 
 ### Primary
 
-- Parentheses: `1 + (2 + 3)` (not implemented)
+- Parentheses: `1 + (2 + 3)`
 - Identifiers
 - Numbers
 
