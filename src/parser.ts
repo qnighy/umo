@@ -275,6 +275,26 @@ class Parser {
       };
     }
   }
+  private parseExpression(): Expression {
+    const start = this.tokens[this.pos].start;
+    let expr = this.parsePrimaryExpression();
+    while (true) {
+      const token = this.tokens[this.pos];
+      if (isSymbolicToken(token, ["+"])) {
+        this.pos++;
+        const rhs = this.parsePrimaryExpression();
+        expr = {
+          type: "AddExpression",
+          lhs: expr,
+          rhs,
+          range: { start, end: rhs.range.end },
+        };
+      } else {
+        break;
+      }
+    }
+    return expr;
+  }
   private parseStatements(): Statement[] {
     const stmts: Statement[] = [];
     while(this.tokens[this.pos].type !== "EOFToken") {
@@ -386,26 +406,6 @@ class Parser {
       rhs,
       range: { start, end: this.tokens[this.pos - 1].end },
     };
-  }
-  private parseExpression(): Expression {
-    const start = this.tokens[this.pos].start;
-    let expr = this.parsePrimaryExpression();
-    while (true) {
-      const token = this.tokens[this.pos];
-      if (isSymbolicToken(token, ["+"])) {
-        this.pos++;
-        const rhs = this.parsePrimaryExpression();
-        expr = {
-          type: "AddExpression",
-          lhs: expr,
-          rhs,
-          range: { start, end: rhs.range.end },
-        };
-      } else {
-        break;
-      }
-    }
-    return expr;
   }
   private parseEOF() {
     const token = this.tokens[this.pos];
