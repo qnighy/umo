@@ -33,6 +33,8 @@ function toJSExpression(node: Expression): string {
       return `${node.value}`;
     case "VariableReference":
       return `${node.name}`;
+    case "CallExpression":
+      return `(${toJSExpression(node.callee)})(${node.arguments.map((a) => toJSExpression(a)).join(", ")})`;
     case "AddExpression":
       return `(${toJSExpression(node.lhs)} + ${toJSExpression(node.rhs)})`;
     case "ParseErroredExpression":

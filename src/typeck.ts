@@ -96,6 +96,10 @@ function getType(errors: SingleTypeCheckerError[], variableTypes: Map<string, Ty
         return { type: "AmbiguousType" }; // TODO
       }
     }
+    case "CallExpression": {
+      // TODO: typecheck f()
+      return { type: "AmbiguousType" };
+    }
     case "AddExpression": {
       const lhsType = getType(errors, variableTypes, ast.lhs);
       const rhsType = getType(errors, variableTypes, ast.rhs);

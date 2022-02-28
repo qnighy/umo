@@ -48,6 +48,7 @@ export type Expression =
   | VariableReference
   | IntegerLiteral
   | FloatingPointLiteral
+  | CallExpression
   | AddExpression
   | ParseErroredExpression;
 export type ParenthesizedExpression = {
@@ -88,6 +89,15 @@ export type IntegerLiteral = {
 export type FloatingPointLiteral = {
   type: "FloatingPointLiteral",
   value: number,
+  range: Range;
+};
+/**
+ * Call expression `f(1, 2)`.
+ */
+export type CallExpression = {
+  type: "CallExpression",
+  callee: Expression,
+  arguments: Expression[],
   range: Range;
 };
 /**
@@ -268,21 +278,69 @@ class Parser {
         message: `Unexpected token: ${tokenName(token)} (expected Expression)`,
       }));
       // TODO: better fallback strategy
-      if (token.type !== "EOFToken" && !isSymbolicToken(token, [",", ";", ")", "}", "]"])) this.pos++;
+      if (this.tokens[this.pos].type !== "EOFToken" && !isSymbolicToken(this.tokens[this.pos], [",", ";", ")", "}", "]"])) this.pos++;
       return {
         type: "ParseErroredExpression",
         range: { start: token.start, end: token.end },
       };
     }
   }
+  private parseCallExpression(): Expression {
+    let expr: Expression = this.parsePrimaryExpression();
+    while (true) {
+      if (isSymbolicToken(this.tokens[this.pos], ["("])) {
+        this.pos++;
+        const argumentExpressions: Expression[] = [];
+        while (true) {
+          // Empty case (f()) or trailing comma case (f(a, b,))
+          if (isSymbolicToken(this.tokens[this.pos], [")"])) {
+            this.pos++;
+            break;
+          }
+          argumentExpressions.push(this.parseExpression());
+          // Non-empty case without trailing comma (f(a, b))
+          if (isSymbolicToken(this.tokens[this.pos], [")"])) {
+            this.pos++;
+            break;
+          }
+          if (isSymbolicToken(this.tokens[this.pos], [","])) {
+            this.pos++;
+          } else {
+            this.errors.push(new SingleParseError({
+              start: this.tokens[this.pos].start,
+              end: this.tokens[this.pos].end,
+              message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ")" or ",")`,
+            }));
+            // TODO: better recovery on parenthesis pairs
+            if (this.tokens[this.pos].type !== "EOFToken" && !isSymbolicToken(this.tokens[this.pos], [",", ";", ")", "}", "]"])) this.pos++;
+            if (isSymbolicToken(this.tokens[this.pos], [","])) {
+              this.pos++;
+              continue;
+            }
+            if (isSymbolicToken(this.tokens[this.pos], [")"])) this.pos++;
+            break;
+          }
+        }
+        expr = {
+          type: "CallExpression",
+          callee: expr,
+          arguments: argumentExpressions,
+          range: { start: expr.range.start, end: this.tokens[this.pos - 1].end },
+        };
+      } else {
+        break;
+      }
+    }
+    return expr;
+  }
   private parseExpression(): Expression {
     const start = this.tokens[this.pos].start;
-    let expr = this.parsePrimaryExpression();
+    let expr = this.parseCallExpression();
     while (true) {
       const token = this.tokens[this.pos];
       if (isSymbolicToken(token, ["+"])) {
         this.pos++;
-        const rhs = this.parsePrimaryExpression();
+        const rhs = this.parseCallExpression();
         expr = {
           type: "AddExpression",
           lhs: expr,
