@@ -19,17 +19,28 @@ Currently `// comment` is implemented
 - Identifiers
 - Numbers
 
-### Identifiers
+### Primary -- Identifiers
 
 Currently `/[a-zA-Z_][a-zA-Z_0-9]*/`
 
-### Numbers
+### Primary -- Numbers
 
 - Decimal integer: `/\d+/` (octal-like numbers like `018` may be forbidden later)
 - Hexadecimal integer (not implemented)
 - Octal integer (not implemented)
 - Binary integer (not implemented)
 - Decimal floating-point number `/\d+\.\d+/`
+
+### Call/Member expressions
+
+- Call expressions: `foo(bar, baz)`
+- Member expressions: `foo.bar` (not implemented)
+
+### Call/Member expressions -- Call expressions
+
+- Empty arguments: `foo()`
+- Non-empty arguments: `foo(bar, baz)`
+- Trailing comma: `foo(bar, baz,)`
 
 ### Operators
 
