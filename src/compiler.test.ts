@@ -87,6 +87,13 @@ describe("compile", () => {
         const expected = readFileOrNull(path.resolve(testcaseDir, "output.js"));
         it(testcaseName, () => {
           const output = compile(input);
+          if (!config.compileOnly) {
+            evalWith(output, {
+              assert_eq(a: any, b: any) {
+                if (a !== b) throw new Error(`${a} !== ${b}`);
+              }
+            });
+          }
           if ((updateSnapshot === "new" && expected === null) || updateSnapshot === "all") {
             if (output !== expected) {
               fs.writeFileSync(path.resolve(testcaseDir, "output.js"), output, "utf8");
@@ -102,3 +109,9 @@ describe("compile", () => {
     }
   });
 });
+
+function evalWith(code: string, locals: Record<string, any>): any {
+  const localKeys = Object.keys(locals);
+  const f = new Function(...localKeys, code);
+  return f.apply(null, localKeys.map(k => locals[k]));
+}
