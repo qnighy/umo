@@ -23,10 +23,15 @@ function toJSStatement(stmt: Statement): string {
   }
 }
 
-function toJSExpression(node: Expression): string {
+function toJSExpression(node: Expression, outerPrec: number = 4): string {
+  if (node.type === "ParenthesizedExpression") {
+    return toJSExpression(node.expression, outerPrec);
+  }
+  const prec = precedence(node);
+  if (prec > outerPrec) {
+    return `(${toJSExpression(node)})`;
+  }
   switch (node.type) {
-    case "ParenthesizedExpression":
-      return toJSExpression(node.expression);
     case "IntegerLiteral":
       return `${node.value}n`;
     case "FloatingPointLiteral":
@@ -34,9 +39,25 @@ function toJSExpression(node: Expression): string {
     case "VariableReference":
       return `${node.name}`;
     case "CallExpression":
-      return `(${toJSExpression(node.callee)})(${node.arguments.map((a) => toJSExpression(a)).join(", ")})`;
+      return `${toJSExpression(node.callee, prec)}(${node.arguments.map((a) => toJSExpression(a)).join(", ")})`;
     case "AddExpression":
-      return `(${toJSExpression(node.lhs)} + ${toJSExpression(node.rhs)})`;
+      return `${toJSExpression(node.lhs, prec)} + ${toJSExpression(node.rhs, prec - 1)}`;
+    case "ParseErroredExpression":
+      throw new Error("Cannot compile sources with parse error");
+  }
+}
+
+function precedence(node: Expression): number {
+  switch (node.type) {
+    case "ParenthesizedExpression":
+    case "IntegerLiteral":
+    case "FloatingPointLiteral":
+    case "VariableReference":
+      return 0;
+    case "CallExpression":
+      return 1;
+    case "AddExpression":
+      return 2;
     case "ParseErroredExpression":
       throw new Error("Cannot compile sources with parse error");
   }
