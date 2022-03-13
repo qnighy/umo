@@ -256,9 +256,7 @@ class Parser {
           end: this.tokens[this.pos].end,
           message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected ")")`,
         }));
-        while (this.tokens[this.pos].type !== "EOFToken" && !isSymbolicToken(this.tokens[this.pos], [",", ";", ")", "}", "]"])) {
-          this.pos++;
-        }
+        this.recover([")", "}", "]", ";"]);
         // "(x +)" => recover after ")"
         // "(x;" => recover before ";"
         // "(x]" => recover before "]"
@@ -277,8 +275,7 @@ class Parser {
         end: token.end,
         message: `Unexpected token: ${tokenName(token)} (expected Expression)`,
       }));
-      // TODO: better fallback strategy
-      if (this.tokens[this.pos].type !== "EOFToken" && !isSymbolicToken(this.tokens[this.pos], [",", ";", ")", "}", "]"])) this.pos++;
+      this.recover([")", "}", "]", ";"]);
       return {
         type: "ParseErroredExpression",
         range: { start: token.start, end: token.end },
@@ -452,9 +449,8 @@ class Parser {
         hasError = true;
       }
       // Recover towards a statement boundary or something of the sort.
-      while (this.tokens[this.pos].type !== "EOFToken" && !isSymbolicToken(this.tokens[this.pos], [";", "}", ")", "]"])) {
-        this.pos++;
-      }
+      this.recover([")", "}", "]", ";"]);
+      if (isSymbolicToken(this.tokens[this.pos], [";"])) this.pos++;
       if (this.tokens[this.pos].type !== "EOFToken") this.pos++;
     }
 
@@ -475,6 +471,28 @@ class Parser {
       }));
       this.pos++;
       return;
+    }
+  }
+  private recover(stopAt: string[]) {
+    while (this.tokens[this.pos].type !== "EOFToken" && !isSymbolicToken(this.tokens[this.pos], stopAt)) {
+      if (isSymbolicToken(this.tokens[this.pos], ["("])) {
+        this.pos++;
+        // In case of "(;)", consider "(" as an unmatched paren.
+        this.recover([")", "}", "]", ";"]);
+        if (isSymbolicToken(this.tokens[this.pos], [")"])) this.pos++;
+      } else if (isSymbolicToken(this.tokens[this.pos], ["]"])) {
+        this.pos++;
+        // In case of "[;]", consider "[" as an unmatched bracket.
+        this.recover([")", "}", "]", ";"]);
+        if (isSymbolicToken(this.tokens[this.pos], ["]"])) this.pos++;
+      } else if (isSymbolicToken(this.tokens[this.pos], ["}"])) {
+        this.pos++;
+        // Consider "{;}" a valid matching.
+        this.recover([")", "}", "]"]);
+        if (isSymbolicToken(this.tokens[this.pos], ["}"])) this.pos++;
+      } else {
+        this.pos++;
+      }
     }
   }
   public getError(): ParseError | undefined {
