@@ -23,14 +23,6 @@
       |         ^
     9 | 
 
-8:16: Unexpected token: ] (expected ")" or ",")
-
-    6 | 1;
-    7 | // Recovers before "]" (TODO)
-    8 | let x = [(1 + 2];
-      |                ^
-    9 | 
-
 8:16: Unexpected token: ] (expected ;)
 
     6 | 1;

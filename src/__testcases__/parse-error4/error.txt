@@ -23,24 +23,6 @@
     7 | 1;
     8 | 
 
-6:11: Unexpected token: , (expected Expression)
-
-    4 | 
-    5 | // Recovers within each argument
-    6 | f(1 +, 2 +, 3 +);
-      |           ^
-    7 | 1;
-    8 | 
-
-6:16: Unexpected token: ) (expected Expression)
-
-    4 | 
-    5 | // Recovers within each argument
-    6 | f(1 +, 2 +, 3 +);
-      |                ^
-    7 | 1;
-    8 | 
-
 9:4: Unexpected token: # (expected ")" or ",")
 
      7 | 1;

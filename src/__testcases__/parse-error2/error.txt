@@ -130,11 +130,3 @@
        |        ^
     15 | 
 
-14:10: Unexpected token: integer literal 1 (expected ;)
-
-    12 | let x 1 + 2;
-    13 | let let = 1;
-    14 | let [] = 1;
-       |          ^
-    15 | 
-
