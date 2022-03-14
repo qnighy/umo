@@ -40,6 +40,8 @@ function toJSExpression(node: Expression, outerPrec: number = 4): string {
       return `${node.name}`;
     case "CallExpression":
       return `${toJSExpression(node.callee, prec)}(${node.arguments.map((a) => toJSExpression(a)).join(", ")})`;
+    case "ClosureExpression":
+      return `(${node.parameters.join(", ")}) => ${toJSExpression(node.body, prec)}`;
     case "AddExpression":
       return `${toJSExpression(node.lhs, prec)} + ${toJSExpression(node.rhs, prec - 1)}`;
     case "ParseErroredExpression":
@@ -58,6 +60,8 @@ function precedence(node: Expression): number {
       return 1;
     case "AddExpression":
       return 2;
+    case "ClosureExpression":
+      return 3;
     case "ParseErroredExpression":
       throw new Error("Cannot compile sources with parse error");
   }

@@ -49,6 +49,7 @@ export type Expression =
   | IntegerLiteral
   | FloatingPointLiteral
   | CallExpression
+  | ClosureExpression
   | AddExpression
   | ParseErroredExpression;
 export type ParenthesizedExpression = {
@@ -98,6 +99,15 @@ export type CallExpression = {
   type: "CallExpression",
   callee: Expression,
   arguments: Expression[],
+  range: Range;
+};
+/**
+ * Closure `|x| x * 2`.
+ */
+export type ClosureExpression = {
+  type: "ClosureExpression",
+  parameters: string[],
+  body: Expression,
   range: Range;
 };
 /**
@@ -330,7 +340,7 @@ class Parser {
     }
     return expr;
   }
-  private parseExpression(): Expression {
+  private parseAdditiveExpression(): Expression {
     const start = this.tokens[this.pos].start;
     let expr = this.parseCallExpression();
     while (true) {
@@ -349,6 +359,64 @@ class Parser {
       }
     }
     return expr;
+  }
+  private parseExpression(): Expression {
+    const start = this.tokens[this.pos].start;
+    if (isSymbolicToken(this.tokens[this.pos], ["|"])) {
+      // Closure |x| x * 2
+      this.pos++;
+      const parameters = this.parseParameterList();
+      const body = this.parseExpression();
+      return {
+        type: "ClosureExpression",
+        parameters,
+        body,
+        range: { start, end: body.range.end },
+      };
+    } else {
+      return this.parseAdditiveExpression();
+    }
+  }
+  private parseParameterList(): string[] {
+    const parameterNames: string[] = [];
+    while (true) {
+      if (isSymbolicToken(this.tokens[this.pos], ["|"])) {
+        // Empty parameter list "||" or trailing comma "|x, y,|"
+        this.pos++;
+        break;
+      }
+      const token = this.tokens[this.pos];
+      if (token.type !== "IdentifierToken") {
+        this.errors.push(new SingleParseError({
+          start: token.start,
+          end: token.end,
+          message: `Unexpected token: ${tokenName(token)} (expected Identifier)`,
+        }));
+        this.recover([")", "}", "]", ";", "|"]);
+        if (isSymbolicToken(this.tokens[this.pos], ["|"])) this.pos++;
+        break;
+      }
+      parameterNames.push(token.name);
+      this.pos++;
+      if (isSymbolicToken(this.tokens[this.pos], ["|"])) {
+        // End of the parameter list |x, y|
+        this.pos++;
+        break;
+      }
+      if (isSymbolicToken(this.tokens[this.pos], [","])) {
+        this.pos++;
+      } else {
+        this.errors.push(new SingleParseError({
+          start: this.tokens[this.pos].start,
+          end: this.tokens[this.pos].end,
+          message: `Unexpected token: ${tokenName(this.tokens[this.pos])} (expected "|" or ",")`,
+        }));
+        this.recover([")", "}", "]", ";", "|"]);
+        if (isSymbolicToken(this.tokens[this.pos], ["|"])) this.pos++;
+        break;
+      }
+    }
+    return parameterNames;
   }
   private parseStatements(): Statement[] {
     const stmts: Statement[] = [];

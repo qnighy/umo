@@ -57,6 +57,10 @@ Note on types:
 
 - Arithmetic operators: different types cannot be mixed together.
 
+### Closures
+
+- Closure: `|x| x * 2` (not implemented, subject to change)
+
 ## Statements
 
 ### Expression statements
