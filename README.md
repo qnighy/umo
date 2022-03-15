@@ -77,6 +77,18 @@ let <ident> = <expr>;
 
 The identifiers are in scope after the statement.
 
+#### Scoping
+
+The expression in the `let` statement can reference variables declared before the statement.
+Especially, it cannot reference variables declared in the statement itself.
+
+```
+// error
+let f = |x| f(x);
+```
+
+This rule is not implemented yet and subject to change.
+
 ## Types
 
 - Primitive types: `int`, `f64`, ... (only `int` and `f64` are implemented now)
