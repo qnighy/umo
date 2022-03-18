@@ -199,6 +199,7 @@ describe("parseStatements", () => {
           },
           range: { start: { line: 0, column: 8 }, end: { line: 0, column: 13 } },
         },
+        typeAnnotation: null,
         range: { start: { line: 0, column: 0 }, end: { line: 0, column: 14 } },
       },
       {
@@ -218,6 +219,7 @@ describe("parseStatements", () => {
           },
           range: { start: { line: 1, column: 8 }, end: { line: 1, column: 13 } },
         },
+        typeAnnotation: null,
         range: { start: { line: 1, column: 0 }, end: { line: 1, column: 14 } },
       },
       {

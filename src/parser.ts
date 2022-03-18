@@ -33,6 +33,7 @@ export type LetStatement = {
   type: "LetStatement",
   lhs: string,
   rhs: Expression,
+  typeAnnotation: Type | null;
   range: Range;
 };
 /**
@@ -40,6 +41,35 @@ export type LetStatement = {
  */
 export type ParseErroredStatement = {
   type: "ParseErroredStatement",
+  range: Range;
+};
+
+export type Type =
+  | IntType
+  | F64Type
+  | ParseErroredType;
+
+/**
+ * `int`: a type representing integers
+ */
+export type IntType = {
+  type: "IntType",
+  range: Range;
+};
+
+/**
+ * `f64`: a type representing 64-bit floating point numbers
+ */
+export type F64Type = {
+  type: "F64Type",
+  range: Range;
+}
+
+/**
+ * Placeholder node for when we encountered a parse error.
+ */
+export type ParseErroredType = {
+  type: "ParseErroredType",
   range: Range;
 };
 
@@ -418,6 +448,33 @@ class Parser {
     }
     return parameterNames;
   }
+  private parseType(): Type {
+    const token = this.tokens[this.pos];
+    if (token.type === "IdentifierToken" && token.name === "int") {
+      this.pos++;
+      return {
+        type: "IntType",
+        range: { start: token.start, end: token.end },
+      };
+    } else if (token.type === "IdentifierToken" && token.name === "f64") {
+      this.pos++;
+      return {
+        type: "F64Type",
+        range: { start: token.start, end: token.end },
+      };
+    } else {
+      this.errors.push(new SingleParseError({
+        start: token.start,
+        end: token.end,
+        message: `Unexpected token: ${tokenName(token)} (expected int or f64)`,
+      }));
+      this.recover([")", "}", "]", ";"]);
+      return {
+        type: "ParseErroredType",
+        range: { start: token.start, end: token.end },
+      };
+    }
+  }
   private parseStatements(): Statement[] {
     const stmts: Statement[] = [];
     while(this.tokens[this.pos].type !== "EOFToken") {
@@ -473,6 +530,7 @@ class Parser {
           type: "ParseErroredExpression",
           range: { start, end },
         },
+        typeAnnotation: null,
         range: { start, end },
       };
     }
@@ -490,6 +548,12 @@ class Parser {
       }));
       lhs = "";
       hasError = true;
+    }
+
+    let typeAnnotation: Type | null = null;
+    if (isSymbolicToken(this.tokens[this.pos], [":"])) {
+      this.pos++;
+      typeAnnotation = this.parseType();
     }
 
     if (isSymbolicToken(this.tokens[this.pos], ["="])) {
@@ -526,6 +590,7 @@ class Parser {
       type: "LetStatement",
       lhs,
       rhs,
+      typeAnnotation,
       range: { start, end: this.tokens[this.pos - 1].end },
     };
   }

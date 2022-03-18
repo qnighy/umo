@@ -73,6 +73,7 @@ Expression + `;` is an expression statement.
 
 ```
 let <ident> = <expr>;
+let <ident>: <type> = <expr>;
 ```
 
 The identifiers are in scope after the statement.
@@ -93,6 +94,7 @@ This rule is not implemented yet and subject to change.
 
 - Primitive types: `int`, `f64`, ... (only `int` and `f64` are implemented now)
 - Placeholder type called `Ambiguous` (`Ambiguous<Lo, Up>`) ... corresponds with `any` in TS.
+  - the corresponding syntax is not implemented yet.
 - TBD
 
 ## Development
