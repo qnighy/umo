@@ -1,6 +1,0 @@
-1:1: Invalid types in addition
-
-    1 | 1 + 2.5;
-      | ^^^^^^^
-    2 | 
-

@@ -1,4 +1,0 @@
-let foo = 1;
-let foo: int = 1;
-let bar = 1.0;
-let bar: f64 = 1.0;

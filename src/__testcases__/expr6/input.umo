@@ -1,4 +1,0 @@
-let f = |x| x + 10;
-assert_eq(f(f(3)), 23);
-let compose = |f, g| |x| f(g(x));
-assert_eq(compose(|x| x + 10, |x| x + 20)(3), 33);
