@@ -1,6 +1,6 @@
 use std::str;
 
-use crate::eval::{eval, value_string, Env};
+use crate::eval::{eval, value_string};
 use crate::parsing::parse;
 
 pub mod ast;
@@ -8,7 +8,7 @@ mod eval;
 mod parsing;
 
 pub fn exec(text: &str) -> String {
-    value_string(&eval(&parse(text), &Env::default()))
+    value_string(&eval(&parse(text)))
 }
 
 #[test]
@@ -16,18 +16,15 @@ fn test_lit() {
     use crate::ast::expr;
     use crate::eval::Value;
 
-    assert_eq!(eval(&expr::int(42), &Env::default()), Value::Int(42));
+    assert_eq!(eval(&expr::int(42)), Value::Int(42));
     assert_eq!(
-        eval(
-            &expr::arr(&[
-                expr::int(72),
-                expr::int(101),
-                expr::int(108),
-                expr::int(108),
-                expr::int(111),
-            ]),
-            &Env::default()
-        ),
+        eval(&expr::arr(&[
+            expr::int(72),
+            expr::int(101),
+            expr::int(108),
+            expr::int(108),
+            expr::int(111),
+        ])),
         Value::Arr(vec![
             Value::Int(72),
             Value::Int(101),
@@ -44,14 +41,11 @@ fn test_let() {
     use crate::eval::Value;
 
     assert_eq!(
-        eval(
-            &expr::let_(
-                "foo",
-                expr::int(42),
-                expr::arr(&[expr::var("foo"), expr::int(50),]),
-            ),
-            &Env::default()
-        ),
+        eval(&expr::let_(
+            "foo",
+            expr::int(42),
+            expr::arr(&[expr::var("foo"), expr::int(50),]),
+        )),
         Value::Arr(vec![Value::Int(42), Value::Int(50),])
     );
 }
