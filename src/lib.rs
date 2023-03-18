@@ -85,6 +85,10 @@ enum Token {
     LBrack,
     RBrack,
     Comma,
+    Equal,
+    KeywordIn,
+    KeywordLet,
+    Ident(String),
     Int(i32),
 }
 
@@ -99,6 +103,18 @@ fn tokenize(s: &[u8]) -> Vec<Token> {
             break;
         }
         match s[i] {
+            b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
+                let start = i;
+                while i < s.len() && (s[i].is_ascii_alphanumeric() || s[i] == b'_') {
+                    i += 1;
+                }
+                let ident = str::from_utf8(&s[start..i]).unwrap().to_owned();
+                tokens.push(match ident.as_str() {
+                    "in" => Token::KeywordIn,
+                    "let" => Token::KeywordLet,
+                    _ => Token::Ident(ident),
+                })
+            }
             b'0'..=b'9' => {
                 let start = i;
                 while i < s.len() && s[i].is_ascii_digit() {
@@ -123,6 +139,10 @@ fn tokenize(s: &[u8]) -> Vec<Token> {
                 i += 1;
                 tokens.push(Token::Comma);
             }
+            b'=' => {
+                i += 1;
+                tokens.push(Token::Equal);
+            }
             _ => panic!("Invalid input: {:?}", s[i] as char),
         }
     }
@@ -145,6 +165,34 @@ impl Parser {
     }
     fn expr(&mut self) -> Expr {
         match self.tokens.get(self.pos) {
+            Some(Token::KeywordLet) => {
+                self.pos += 1;
+                let name = if let Some(Token::Ident(name)) = self.tokens.get(self.pos) {
+                    name.clone()
+                } else {
+                    panic!("Unexpected {:?} for Ident", self.tokens.get(self.pos));
+                };
+                self.pos += 1;
+                if let Some(Token::Equal) = self.tokens.get(self.pos) {
+                    // OK
+                } else {
+                    panic!("Unexpected {:?} for Equal", self.tokens.get(self.pos));
+                }
+                self.pos += 1;
+                let init = self.expr();
+                if let Some(Token::KeywordIn) = self.tokens.get(self.pos) {
+                    // OK
+                } else {
+                    panic!("Unexpected {:?} for KeywordIn", self.tokens.get(self.pos));
+                }
+                self.pos += 1;
+                let cont = self.expr();
+                Expr::Let(name, Box::new(init), Box::new(cont))
+            }
+            Some(Token::Ident(name)) => {
+                self.pos += 1;
+                Expr::Var(name.to_owned())
+            }
             Some(Token::Int(n)) => {
                 self.pos += 1;
                 Expr::Int(*n)
@@ -224,4 +272,9 @@ fn test_let() {
 #[test]
 fn test_exec_lit() {
     assert_eq!(exec("[72, 101, 108, 108, 111]"), "Hello");
+}
+
+#[test]
+fn test_exec_let() {
+    assert_eq!(exec("let x = 72 in [x, 101, 108, 108, 111]"), "Hello");
 }
