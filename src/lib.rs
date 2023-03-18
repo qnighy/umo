@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -8,12 +9,20 @@ pub enum Value {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Expr {
+    Let(String, Box<Expr>, Box<Expr>),
+    Var(String),
     Int(i32),
     Arr(Vec<Expr>),
 }
 
 pub mod expr {
     use super::*;
+    pub fn let_(name: &str, init: Expr, cont: Expr) -> Expr {
+        Expr::Let(name.to_owned(), Box::new(init), Box::new(cont))
+    }
+    pub fn var(name: &str) -> Expr {
+        Expr::Var(name.to_owned())
+    }
     pub fn int(x: i32) -> Expr {
         Expr::Int(x)
     }
@@ -22,10 +31,28 @@ pub mod expr {
     }
 }
 
-pub fn eval(e: &Expr) -> Value {
+#[derive(Debug, Clone, Default)]
+pub struct Env {
+    locals: HashMap<String, Value>,
+}
+
+pub fn eval(e: &Expr, env: &Env) -> Value {
     match e {
+        Expr::Let(name, init, cont) => {
+            let init_val = eval(init, env);
+            let mut new_env = env.clone();
+            new_env.locals.insert(name.clone(), init_val);
+            eval(cont, &new_env)
+        }
+        Expr::Var(name) => {
+            if let Some(value) = env.locals.get(name) {
+                value.clone()
+            } else {
+                panic!("Undefined variable: {}", name);
+            }
+        }
         Expr::Int(x) => Value::Int(*x),
-        Expr::Arr(a) => Value::Arr(a.iter().map(|elem| eval(elem)).collect::<Vec<_>>()),
+        Expr::Arr(a) => Value::Arr(a.iter().map(|elem| eval(elem, env)).collect::<Vec<_>>()),
     }
 }
 
@@ -50,7 +77,7 @@ fn value_string(v: &Value) -> String {
 }
 
 pub fn exec(text: &str) -> String {
-    value_string(&eval(&parse(text)))
+    value_string(&eval(&parse(text), &Env::default()))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -157,15 +184,18 @@ pub fn parse(text: &str) -> Expr {
 
 #[test]
 fn test_lit() {
-    assert_eq!(eval(&expr::int(42)), Value::Int(42));
+    assert_eq!(eval(&expr::int(42), &Env::default()), Value::Int(42));
     assert_eq!(
-        eval(&expr::arr(&[
-            expr::int(72),
-            expr::int(101),
-            expr::int(108),
-            expr::int(108),
-            expr::int(111),
-        ])),
+        eval(
+            &expr::arr(&[
+                expr::int(72),
+                expr::int(101),
+                expr::int(108),
+                expr::int(108),
+                expr::int(111),
+            ]),
+            &Env::default()
+        ),
         Value::Arr(vec![
             Value::Int(72),
             Value::Int(101),
@@ -173,6 +203,21 @@ fn test_lit() {
             Value::Int(108),
             Value::Int(111),
         ])
+    );
+}
+
+#[test]
+fn test_let() {
+    assert_eq!(
+        eval(
+            &expr::let_(
+                "foo",
+                expr::int(42),
+                expr::arr(&[expr::var("foo"), expr::int(50),]),
+            ),
+            &Env::default()
+        ),
+        Value::Arr(vec![Value::Int(42), Value::Int(50),])
     );
 }
 
