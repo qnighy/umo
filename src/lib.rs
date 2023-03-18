@@ -1,80 +1,10 @@
-use std::collections::HashMap;
 use std::str;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Value {
-    Int(i32),
-    Arr(Vec<Value>),
-}
+use crate::ast::Expr;
+use crate::eval::{eval, value_string, Env};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Expr {
-    Let(String, Box<Expr>, Box<Expr>),
-    Var(String),
-    Int(i32),
-    Arr(Vec<Expr>),
-}
-
-pub mod expr {
-    use super::*;
-    pub fn let_(name: &str, init: Expr, cont: Expr) -> Expr {
-        Expr::Let(name.to_owned(), Box::new(init), Box::new(cont))
-    }
-    pub fn var(name: &str) -> Expr {
-        Expr::Var(name.to_owned())
-    }
-    pub fn int(x: i32) -> Expr {
-        Expr::Int(x)
-    }
-    pub fn arr(a: &[Expr]) -> Expr {
-        Expr::Arr(Vec::from(a))
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Env {
-    locals: HashMap<String, Value>,
-}
-
-pub fn eval(e: &Expr, env: &Env) -> Value {
-    match e {
-        Expr::Let(name, init, cont) => {
-            let init_val = eval(init, env);
-            let mut new_env = env.clone();
-            new_env.locals.insert(name.clone(), init_val);
-            eval(cont, &new_env)
-        }
-        Expr::Var(name) => {
-            if let Some(value) = env.locals.get(name) {
-                value.clone()
-            } else {
-                panic!("Undefined variable: {}", name);
-            }
-        }
-        Expr::Int(x) => Value::Int(*x),
-        Expr::Arr(a) => Value::Arr(a.iter().map(|elem| eval(elem, env)).collect::<Vec<_>>()),
-    }
-}
-
-fn value_string(v: &Value) -> String {
-    let Value::Arr(v) = v else {
-        panic!("Not a string: {:?}", v)
-    };
-    let v = v
-        .iter()
-        .map(|elem| {
-            let Value::Int(elem) = elem else {
-                return None;
-            };
-            if !(0..=255).contains(elem) {
-                return None;
-            }
-            Some(*elem as u8)
-        })
-        .collect::<Option<Vec<_>>>()
-        .unwrap_or_else(|| panic!("Not a string: {:?}", v));
-    String::from_utf8_lossy(&v).into_owned()
-}
+pub mod ast;
+mod eval;
 
 pub fn exec(text: &str) -> String {
     value_string(&eval(&parse(text), &Env::default()))
@@ -232,6 +162,9 @@ pub fn parse(text: &str) -> Expr {
 
 #[test]
 fn test_lit() {
+    use crate::ast::expr;
+    use crate::eval::Value;
+
     assert_eq!(eval(&expr::int(42), &Env::default()), Value::Int(42));
     assert_eq!(
         eval(
@@ -256,6 +189,9 @@ fn test_lit() {
 
 #[test]
 fn test_let() {
+    use crate::ast::expr;
+    use crate::eval::Value;
+
     assert_eq!(
         eval(
             &expr::let_(
