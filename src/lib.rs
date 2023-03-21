@@ -51,6 +51,20 @@ fn test_let() {
 }
 
 #[test]
+fn test_calc() {
+    use crate::ast::expr;
+    use crate::eval::Value;
+
+    assert_eq!(
+        eval(&expr::call(
+            expr::var("add"),
+            &[expr::int(20), expr::int(22)]
+        )),
+        Value::Int(42)
+    );
+}
+
+#[test]
 fn test_exec_lit() {
     assert_eq!(exec("[72, 101, 108, 108, 111]"), "Hello");
 }
@@ -58,4 +72,12 @@ fn test_exec_lit() {
 #[test]
 fn test_exec_let() {
     assert_eq!(exec("let x = 72 in [x, 101, 108, 108, 111]"), "Hello");
+}
+
+#[test]
+fn test_exec_calc() {
+    assert_eq!(
+        exec("let x = 42 in [add(x, 30), 101, 108, 108, 111]"),
+        "Hello"
+    );
 }

@@ -9,8 +9,10 @@ use crate::ast::Expr;
 enum CExpr {
     Let(Box<CExpr>, Box<CExpr>),
     Var(usize, /** movable? */ bool),
+    Call(Box<CExpr>, Vec<CExpr>),
     Int(i32),
     Arr(Vec<CExpr>),
+    Builtin(BuiltinKind),
 }
 
 fn compile(e: &Expr) -> CExpr {
@@ -49,8 +51,23 @@ fn compile1(e: &Expr, env: &mut Compile1Env) -> CExpr {
             if let Some(&idx) = env.locals.get(name) {
                 CExpr::Var(env.index - idx - 1, false)
             } else {
-                panic!("Undefined variable: {}", name);
+                let builtin = match name.as_str() {
+                    "add" => BuiltinKind::Add,
+                    "sub" => BuiltinKind::Sub,
+                    "mul" => BuiltinKind::Mul,
+                    "div" => BuiltinKind::Div,
+                    _ => panic!("Undefined variable: {}", name),
+                };
+                CExpr::Builtin(builtin)
             }
+        }
+        Expr::Call(callee, args) => {
+            let callee = compile1(callee, env);
+            let args = args
+                .iter()
+                .map(|arg| compile1(arg, env))
+                .collect::<Vec<_>>();
+            CExpr::Call(Box::new(callee), args)
         }
         Expr::Int(x) => CExpr::Int(*x),
         Expr::Arr(elems) => CExpr::Arr(
@@ -94,12 +111,19 @@ fn compile2(e: &mut CExpr, env: &mut Compile2Env, used: &mut UsedSet<'_>) {
                 *movable = true;
             }
         }
+        CExpr::Call(callee, args) => {
+            for arg in args.iter_mut().rev() {
+                compile2(arg, env, used);
+            }
+            compile2(callee, env, used);
+        }
         CExpr::Int(_) => {}
         CExpr::Arr(elems) => {
-            for elem in elems {
+            for elem in elems.iter_mut().rev() {
                 compile2(elem, env, used);
             }
         }
+        CExpr::Builtin(_) => {}
     }
 }
 
@@ -107,6 +131,15 @@ fn compile2(e: &mut CExpr, env: &mut Compile2Env, used: &mut UsedSet<'_>) {
 pub enum Value {
     Int(i32),
     Arr(Vec<Value>),
+    Builtin(BuiltinKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BuiltinKind {
+    Add,
+    Sub,
+    Mul,
+    Div,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -136,8 +169,40 @@ fn eval_c(e: &CExpr, env: &mut Env) -> Value {
                 env.locals[level].clone()
             }
         }
+        CExpr::Call(callee, args) => {
+            let callee_val = eval_c(callee, env);
+            let args_val = args.iter().map(|arg| eval_c(arg, env)).collect::<Vec<_>>();
+            match callee_val {
+                Value::Builtin(BuiltinKind::Add) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to add");
+                    };
+                    Value::Int(x + y)
+                }
+                Value::Builtin(BuiltinKind::Sub) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to sub");
+                    };
+                    Value::Int(x - y)
+                }
+                Value::Builtin(BuiltinKind::Mul) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to mul");
+                    };
+                    Value::Int(x * y)
+                }
+                Value::Builtin(BuiltinKind::Div) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to div");
+                    };
+                    Value::Int(x / y)
+                }
+                _ => panic!("Callee not a function"),
+            }
+        }
         CExpr::Int(x) => Value::Int(*x),
         CExpr::Arr(a) => Value::Arr(a.iter().map(|elem| eval_c(elem, env)).collect::<Vec<_>>()),
+        CExpr::Builtin(builtin) => Value::Builtin(*builtin),
     }
 }
 
