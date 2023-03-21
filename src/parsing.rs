@@ -136,8 +136,9 @@ impl Parser {
                 let PExpr::AmbiguousParen(elems, _) = lhs else {
                     unreachable!();
                 };
-                let _arrow_head = self.reparse_paren(elems);
-                todo!("arrow function");
+                let arrow_head = self.reparse_paren(elems);
+                let body = self.expr();
+                return Expr::Abs(arrow_head, Box::new(body));
             }
         }
         lhs.crush()

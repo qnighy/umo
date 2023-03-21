@@ -81,3 +81,18 @@ fn test_exec_calc() {
         "Hello"
     );
 }
+
+#[test]
+fn test_exec_lambda() {
+    assert_eq!(
+        exec(
+            "
+                let f = (x) => add(x, 30) in
+                let g = (y) => f(y) in
+                let x = 42 in
+                [g(x), 101, 108, 108, 111]
+            "
+        ),
+        "Hello"
+    );
+}

@@ -2,7 +2,7 @@
 pub enum Expr {
     Let(String, Box<Expr>, Box<Expr>),
     Var(String),
-    // Abs(Vec<String>, Box<Expr>),
+    Abs(Vec<String>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
     Int(i32),
     Arr(Vec<Expr>),
@@ -16,12 +16,12 @@ pub mod expr {
     pub fn var(name: &str) -> Expr {
         Expr::Var(name.to_owned())
     }
-    // pub fn abs(params: &[&str], body: Expr) -> Expr {
-    //     Expr::Abs(
-    //         params.iter().map(|&s| s.to_owned()).collect::<Vec<_>>(),
-    //         Box::new(body),
-    //     )
-    // }
+    pub fn abs(params: &[&str], body: Expr) -> Expr {
+        Expr::Abs(
+            params.iter().map(|&s| s.to_owned()).collect::<Vec<_>>(),
+            Box::new(body),
+        )
+    }
     pub fn call(callee: Expr, args: &[Expr]) -> Expr {
         Expr::Call(Box::new(callee), args.to_owned())
     }

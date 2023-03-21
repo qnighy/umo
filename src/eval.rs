@@ -9,6 +9,7 @@ use crate::ast::Expr;
 enum CExpr {
     Let(Box<CExpr>, Box<CExpr>),
     Var(usize, /** movable? */ bool),
+    Abs(usize, Box<CExpr>),
     Call(Box<CExpr>, Vec<CExpr>),
     Int(i32),
     Arr(Vec<CExpr>),
@@ -61,6 +62,25 @@ fn compile1(e: &Expr, env: &mut Compile1Env) -> CExpr {
                 CExpr::Builtin(builtin)
             }
         }
+        Expr::Abs(params, body) => {
+            let mut stack = Vec::new();
+            for name in params {
+                let local_idx = env.index;
+                env.index += 1;
+                let old_binding = env.locals.insert(name.to_owned(), local_idx);
+                stack.push(old_binding);
+            }
+            let body = compile1(body, env);
+            for (old_binding, name) in stack.into_iter().zip(params).rev() {
+                if let Some(old_binding) = old_binding {
+                    env.locals.insert(name.to_owned(), old_binding);
+                } else {
+                    env.locals.remove(name);
+                }
+                env.index -= 1;
+            }
+            CExpr::Abs(params.len(), Box::new(body))
+        }
         Expr::Call(callee, args) => {
             let callee = compile1(callee, env);
             let args = args
@@ -111,6 +131,11 @@ fn compile2(e: &mut CExpr, env: &mut Compile2Env, used: &mut UsedSet<'_>) {
                 *movable = true;
             }
         }
+        CExpr::Abs(num_params, body) => {
+            env.index += *num_params;
+            compile2(body, env, used);
+            env.index -= *num_params;
+        }
         CExpr::Call(callee, args) => {
             for arg in args.iter_mut().rev() {
                 compile2(arg, env, used);
@@ -131,8 +156,16 @@ fn compile2(e: &mut CExpr, env: &mut Compile2Env, used: &mut UsedSet<'_>) {
 pub enum Value {
     Int(i32),
     Arr(Vec<Value>),
+    Closure(
+        /** captured stack */ Vec<Value>,
+        /** num params */ usize,
+        ClosureBody,
+    ),
     Builtin(BuiltinKind),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ClosureBody(Box<CExpr>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BuiltinKind {
@@ -169,10 +202,31 @@ fn eval_c(e: &CExpr, env: &mut Env) -> Value {
                 env.locals[level].clone()
             }
         }
+        CExpr::Abs(num_params, body) => {
+            Value::Closure(env.locals.clone(), *num_params, ClosureBody(body.clone()))
+        }
         CExpr::Call(callee, args) => {
             let callee_val = eval_c(callee, env);
             let args_val = args.iter().map(|arg| eval_c(arg, env)).collect::<Vec<_>>();
             match callee_val {
+                Value::Closure(mut captured_stack, num_params, ClosureBody(body)) => {
+                    if args_val.len() != num_params {
+                        panic!(
+                            "Wrong number of arguments: got {}, but required {}",
+                            args.len(),
+                            num_params
+                        );
+                    }
+                    for arg_val in args_val {
+                        captured_stack.push(arg_val.clone())
+                    }
+                    eval_c(
+                        &body,
+                        &mut Env {
+                            locals: captured_stack,
+                        },
+                    )
+                }
                 Value::Builtin(BuiltinKind::Add) => {
                     let [Value::Int(x), Value::Int(y)] = args_val[..] else {
                         panic!("Invalid arguments to add");
