@@ -96,3 +96,26 @@ fn test_exec_lambda() {
         "Hello"
     );
 }
+
+#[test]
+fn test_exec_cond() {
+    assert_eq!(
+        exec(
+            "
+                let y = (f) =>
+                    ((g) => f((x) => g(g)(x)))
+                    ((g) => f((x) => g(g)(x))) in
+                let fib = y((fib) => (n) =>
+                    if le(n, 1) {
+                        n
+                    } else {
+                        add(fib(sub(n, 1)), fib(sub(n, 2)))
+                    }
+                ) in
+                let x = fib(11) in
+                [x]
+            "
+        ),
+        "Y" // 89
+    );
+}

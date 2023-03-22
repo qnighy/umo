@@ -11,6 +11,11 @@ enum CExpr {
     Var(usize, /** movable? */ bool),
     Abs(usize, Box<CExpr>),
     Call(Box<CExpr>, Vec<CExpr>),
+    Cond(
+        /** cond */ Box<CExpr>,
+        /** then */ Box<CExpr>,
+        /** else */ Box<CExpr>,
+    ),
     Int(i32),
     Arr(Vec<CExpr>),
     Builtin(BuiltinKind),
@@ -57,6 +62,12 @@ fn compile1(e: &Expr, env: &mut Compile1Env) -> CExpr {
                     "sub" => BuiltinKind::Sub,
                     "mul" => BuiltinKind::Mul,
                     "div" => BuiltinKind::Div,
+                    "lt" => BuiltinKind::Lt,
+                    "gt" => BuiltinKind::Gt,
+                    "le" => BuiltinKind::Le,
+                    "ge" => BuiltinKind::Ge,
+                    "eq" => BuiltinKind::Eq,
+                    "ne" => BuiltinKind::Ne,
                     _ => panic!("Undefined variable: {}", name),
                 };
                 CExpr::Builtin(builtin)
@@ -88,6 +99,12 @@ fn compile1(e: &Expr, env: &mut Compile1Env) -> CExpr {
                 .map(|arg| compile1(arg, env))
                 .collect::<Vec<_>>();
             CExpr::Call(Box::new(callee), args)
+        }
+        Expr::Cond(cond, then, else_) => {
+            let cond = compile1(cond, env);
+            let then = compile1(then, env);
+            let else_ = compile1(else_, env);
+            CExpr::Cond(Box::new(cond), Box::new(then), Box::new(else_))
         }
         Expr::Int(x) => CExpr::Int(*x),
         Expr::Arr(elems) => CExpr::Arr(
@@ -142,6 +159,12 @@ fn compile2(e: &mut CExpr, env: &mut Compile2Env, used: &mut UsedSet<'_>) {
             }
             compile2(callee, env, used);
         }
+        CExpr::Cond(cond, then, else_) => {
+            // NOTE: this analysis is suboptimal but its ok for now because we are going to rewrite the interpreter
+            compile2(else_, env, used);
+            compile2(then, env, used);
+            compile2(cond, env, used);
+        }
         CExpr::Int(_) => {}
         CExpr::Arr(elems) => {
             for elem in elems.iter_mut().rev() {
@@ -173,6 +196,12 @@ pub enum BuiltinKind {
     Sub,
     Mul,
     Div,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    Eq,
+    Ne,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -251,7 +280,54 @@ fn eval_c(e: &CExpr, env: &mut Env) -> Value {
                     };
                     Value::Int(x / y)
                 }
+                Value::Builtin(BuiltinKind::Lt) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to lt");
+                    };
+                    Value::Int((x < y) as i32)
+                }
+                Value::Builtin(BuiltinKind::Le) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to le");
+                    };
+                    Value::Int((x <= y) as i32)
+                }
+                Value::Builtin(BuiltinKind::Gt) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to gt");
+                    };
+                    Value::Int((x > y) as i32)
+                }
+                Value::Builtin(BuiltinKind::Ge) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to ge");
+                    };
+                    Value::Int((x >= y) as i32)
+                }
+                Value::Builtin(BuiltinKind::Eq) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to eq");
+                    };
+                    Value::Int((x == y) as i32)
+                }
+                Value::Builtin(BuiltinKind::Ne) => {
+                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
+                        panic!("Invalid arguments to ne");
+                    };
+                    Value::Int((x != y) as i32)
+                }
                 _ => panic!("Callee not a function"),
+            }
+        }
+        CExpr::Cond(cond, then, else_) => {
+            let cond = eval_c(cond, env);
+            let Value::Int(cond) = cond else {
+                panic!("Condition not an integer");
+            };
+            if cond != 0 {
+                eval_c(then, env)
+            } else {
+                eval_c(else_, env)
             }
         }
         CExpr::Int(x) => Value::Int(*x),

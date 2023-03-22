@@ -8,9 +8,13 @@ enum Token {
     RParen,
     LBrack,
     RBrack,
+    LBrace,
+    RBrace,
     Comma,
     Equal,
     FatArrow,
+    KeywordElse,
+    KeywordIf,
     KeywordIn,
     KeywordLet,
     Ident(String),
@@ -35,6 +39,8 @@ fn tokenize(s: &[u8]) -> Vec<Token> {
                 }
                 let ident = str::from_utf8(&s[start..i]).unwrap().to_owned();
                 tokens.push(match ident.as_str() {
+                    "else" => Token::KeywordElse,
+                    "if" => Token::KeywordIf,
                     "in" => Token::KeywordIn,
                     "let" => Token::KeywordLet,
                     _ => Token::Ident(ident),
@@ -67,6 +73,14 @@ fn tokenize(s: &[u8]) -> Vec<Token> {
             b']' => {
                 i += 1;
                 tokens.push(Token::RBrack);
+            }
+            b'{' => {
+                i += 1;
+                tokens.push(Token::LBrace);
+            }
+            b'}' => {
+                i += 1;
+                tokens.push(Token::RBrace);
             }
             b',' => {
                 i += 1;
@@ -199,6 +213,43 @@ impl Parser {
                 self.pos += 1;
                 let cont = self.expr();
                 Expr::Let(name, Box::new(init), Box::new(cont)).into()
+            }
+            Some(Token::KeywordIf) => {
+                self.pos += 1;
+                let cond = self.expr();
+                if let Some(Token::LBrace) = self.tokens.get(self.pos) {
+                    // OK
+                } else {
+                    panic!("Unexpected {:?} for LBrace", self.tokens.get(self.pos));
+                }
+                self.pos += 1;
+                let then = self.expr();
+                if let Some(Token::RBrace) = self.tokens.get(self.pos) {
+                    // OK
+                } else {
+                    panic!("Unexpected {:?} for RBrace", self.tokens.get(self.pos));
+                }
+                self.pos += 1;
+                if let Some(Token::KeywordElse) = self.tokens.get(self.pos) {
+                    // OK
+                } else {
+                    panic!("Unexpected {:?} for KeywordElse", self.tokens.get(self.pos));
+                }
+                self.pos += 1;
+                if let Some(Token::LBrace) = self.tokens.get(self.pos) {
+                    // OK
+                } else {
+                    panic!("Unexpected {:?} for LBrace", self.tokens.get(self.pos));
+                }
+                self.pos += 1;
+                let else_ = self.expr();
+                if let Some(Token::RBrace) = self.tokens.get(self.pos) {
+                    // OK
+                } else {
+                    panic!("Unexpected {:?} for RBrace", self.tokens.get(self.pos));
+                }
+                self.pos += 1;
+                Expr::Cond(Box::new(cond), Box::new(then), Box::new(else_)).into()
             }
             Some(Token::Ident(name)) => {
                 self.pos += 1;

@@ -4,6 +4,11 @@ pub enum Expr {
     Var(String),
     Abs(Vec<String>, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
+    Cond(
+        /** cond */ Box<Expr>,
+        /** then */ Box<Expr>,
+        /** else */ Box<Expr>,
+    ),
     Int(i32),
     Arr(Vec<Expr>),
 }
