@@ -119,3 +119,28 @@ fn test_exec_cond() {
         "Y" // 89
     );
 }
+
+#[test]
+fn test_exec_arr() {
+    assert_eq!(
+        exec(
+            "
+                let y2 = (f) =>
+                    ((g) => f((x, y) => g(g)(x, y)))
+                    ((g) => f((x, y) => g(g)(x, y))) in
+                let incr = (a) =>
+                    let incr = y2((incr) => (a, i) =>
+                        if lt(i, array_len(a)) {
+                            incr(array_set(a, i, add(array_get(a, i), 1)), add(i, 1))
+                        } else {
+                            a
+                        }
+                    ) in
+                    incr(a, 0)
+                in
+                incr([71, 100, 107, 107, 110])
+            "
+        ),
+        "Hello"
+    );
+}

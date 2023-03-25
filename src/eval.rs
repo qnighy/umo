@@ -68,6 +68,10 @@ fn compile1(e: &Expr, env: &mut Compile1Env) -> CExpr {
                     "ge" => BuiltinKind::Ge,
                     "eq" => BuiltinKind::Eq,
                     "ne" => BuiltinKind::Ne,
+                    "array_len" => BuiltinKind::ArrayLen,
+                    "array_init" => BuiltinKind::ArrayInit,
+                    "array_get" => BuiltinKind::ArrayGet,
+                    "array_set" => BuiltinKind::ArraySet,
                     _ => panic!("Undefined variable: {}", name),
                 };
                 CExpr::Builtin(builtin)
@@ -202,6 +206,10 @@ pub enum BuiltinKind {
     Ge,
     Eq,
     Ne,
+    ArrayLen,
+    ArrayInit,
+    ArrayGet,
+    ArraySet,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -237,87 +245,7 @@ fn eval_c(e: &CExpr, env: &mut Env) -> Value {
         CExpr::Call(callee, args) => {
             let callee_val = eval_c(callee, env);
             let args_val = args.iter().map(|arg| eval_c(arg, env)).collect::<Vec<_>>();
-            match callee_val {
-                Value::Closure(mut captured_stack, num_params, ClosureBody(body)) => {
-                    if args_val.len() != num_params {
-                        panic!(
-                            "Wrong number of arguments: got {}, but required {}",
-                            args.len(),
-                            num_params
-                        );
-                    }
-                    for arg_val in args_val {
-                        captured_stack.push(arg_val.clone())
-                    }
-                    eval_c(
-                        &body,
-                        &mut Env {
-                            locals: captured_stack,
-                        },
-                    )
-                }
-                Value::Builtin(BuiltinKind::Add) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to add");
-                    };
-                    Value::Int(x + y)
-                }
-                Value::Builtin(BuiltinKind::Sub) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to sub");
-                    };
-                    Value::Int(x - y)
-                }
-                Value::Builtin(BuiltinKind::Mul) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to mul");
-                    };
-                    Value::Int(x * y)
-                }
-                Value::Builtin(BuiltinKind::Div) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to div");
-                    };
-                    Value::Int(x / y)
-                }
-                Value::Builtin(BuiltinKind::Lt) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to lt");
-                    };
-                    Value::Int((x < y) as i32)
-                }
-                Value::Builtin(BuiltinKind::Le) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to le");
-                    };
-                    Value::Int((x <= y) as i32)
-                }
-                Value::Builtin(BuiltinKind::Gt) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to gt");
-                    };
-                    Value::Int((x > y) as i32)
-                }
-                Value::Builtin(BuiltinKind::Ge) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to ge");
-                    };
-                    Value::Int((x >= y) as i32)
-                }
-                Value::Builtin(BuiltinKind::Eq) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to eq");
-                    };
-                    Value::Int((x == y) as i32)
-                }
-                Value::Builtin(BuiltinKind::Ne) => {
-                    let [Value::Int(x), Value::Int(y)] = args_val[..] else {
-                        panic!("Invalid arguments to ne");
-                    };
-                    Value::Int((x != y) as i32)
-                }
-                _ => panic!("Callee not a function"),
-            }
+            eval_call(callee_val, args_val)
         }
         CExpr::Cond(cond, then, else_) => {
             let cond = eval_c(cond, env);
@@ -333,6 +261,129 @@ fn eval_c(e: &CExpr, env: &mut Env) -> Value {
         CExpr::Int(x) => Value::Int(*x),
         CExpr::Arr(a) => Value::Arr(a.iter().map(|elem| eval_c(elem, env)).collect::<Vec<_>>()),
         CExpr::Builtin(builtin) => Value::Builtin(*builtin),
+    }
+}
+
+fn eval_call(callee: Value, args: Vec<Value>) -> Value {
+    match callee {
+        Value::Closure(mut captured_stack, num_params, ClosureBody(body)) => {
+            if args.len() != num_params {
+                panic!(
+                    "Wrong number of arguments: got {}, but required {}",
+                    args.len(),
+                    num_params
+                );
+            }
+            for arg_val in args {
+                captured_stack.push(arg_val.clone())
+            }
+            eval_c(
+                &body,
+                &mut Env {
+                    locals: captured_stack,
+                },
+            )
+        }
+        Value::Builtin(callee) => match callee {
+            BuiltinKind::Add => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to add");
+                };
+                Value::Int(x + y)
+            }
+            BuiltinKind::Sub => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to sub");
+                };
+                Value::Int(x - y)
+            }
+            BuiltinKind::Mul => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to mul");
+                };
+                Value::Int(x * y)
+            }
+            BuiltinKind::Div => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to div");
+                };
+                Value::Int(x / y)
+            }
+            BuiltinKind::Lt => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to lt");
+                };
+                Value::Int((x < y) as i32)
+            }
+            BuiltinKind::Le => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to le");
+                };
+                Value::Int((x <= y) as i32)
+            }
+            BuiltinKind::Gt => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to gt");
+                };
+                Value::Int((x > y) as i32)
+            }
+            BuiltinKind::Ge => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to ge");
+                };
+                Value::Int((x >= y) as i32)
+            }
+            BuiltinKind::Eq => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to eq");
+                };
+                Value::Int((x == y) as i32)
+            }
+            BuiltinKind::Ne => {
+                let [Value::Int(x), Value::Int(y)] = args[..] else {
+                    panic!("Invalid arguments to ne");
+                };
+                Value::Int((x != y) as i32)
+            }
+            BuiltinKind::ArrayLen => {
+                let [Value::Arr(ref arr)] = args[..] else {
+                    panic!("Invalid arguments to array_len");
+                };
+                Value::Int(arr.len() as i32)
+            }
+            BuiltinKind::ArrayInit => {
+                let [Value::Int(len), ref initializer] = args[..] else {
+                    panic!("Invalid arguments to array_init");
+                };
+                Value::Arr(
+                    (0..len)
+                        .map(|i| eval_call(initializer.clone(), vec![Value::Int(i)]))
+                        .collect::<Vec<_>>(),
+                )
+            }
+            BuiltinKind::ArrayGet => {
+                let [Value::Arr(ref arr), Value::Int(i)] = args[..] else {
+                    panic!("Invalid arguments to array_get");
+                };
+                arr[i as usize].clone()
+            }
+            BuiltinKind::ArraySet => {
+                if args.len() != 3 {
+                    panic!("Invalid arguments to array_set");
+                }
+                let mut iter = args.into_iter();
+                let Value::Arr(mut arr) = iter.next().unwrap() else {
+                    panic!("Invalid arguments to array_set");
+                };
+                let Value::Int(i) = iter.next().unwrap() else {
+                    panic!("Invalid arguments to array_set");
+                };
+                let v = iter.next().unwrap();
+                arr[i as usize] = v;
+                Value::Arr(arr)
+            }
+        },
+        _ => panic!("Callee not a function"),
     }
 }
 
