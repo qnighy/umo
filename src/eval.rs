@@ -181,6 +181,7 @@ fn compile2(e: &mut CExpr, env: &mut Compile2Env, used: &mut UsedSet<'_>) {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
+    Invalid,
     Int(i32),
     Arr(Vec<Value>),
     Closure(
@@ -234,7 +235,7 @@ fn eval_c(e: &CExpr, env: &mut Env) -> Value {
         CExpr::Var(idx, movable) => {
             let level = env.locals.len() - *idx - 1;
             if *movable {
-                mem::replace(&mut env.locals[level], Value::Int(0))
+                mem::replace(&mut env.locals[level], Value::Invalid)
             } else {
                 env.locals[level].clone()
             }
