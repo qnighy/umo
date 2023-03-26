@@ -6,6 +6,246 @@ use std::{
 use crate::ast::Expr;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum Expr2 {
+    Let(usize, Box<Expr2>, Box<Expr2>),
+    Var(usize),
+    Abs(
+        /** params */ Vec<usize>,
+        Box<Expr2>,
+        /** captures */ Vec<usize>,
+    ),
+    Call(Box<Expr2>, Vec<Expr2>),
+    Cond(
+        /** cond */ Box<Expr2>,
+        /** then */ Box<Expr2>,
+        /** else */ Box<Expr2>,
+    ),
+    Int(i32),
+    Arr(Vec<Expr2>),
+    Builtin(BuiltinKind),
+}
+
+#[derive(Debug, Clone, Default)]
+struct Ctx2 {
+    next_local: usize,
+    locals: HashMap<String, usize>,
+}
+
+impl Ctx2 {
+    fn fresh_local(&mut self) -> usize {
+        let l = self.next_local;
+        self.next_local += 1;
+        l
+    }
+    fn convert(&mut self, e: &Expr, captures: &mut HashSet<usize>) -> Expr2 {
+        match e {
+            Expr::Let(name, init, cont) => {
+                let id = self.fresh_local();
+                let init = self.convert(init, captures);
+                let old_binding = self.locals.insert(name.to_owned(), id);
+                let cont = self.convert(cont, captures);
+                if let Some(old_binding) = old_binding {
+                    self.locals.insert(name.to_owned(), old_binding);
+                } else {
+                    self.locals.remove(name);
+                }
+                Expr2::Let(id, Box::new(init), Box::new(cont))
+            }
+            Expr::Var(name) => {
+                if let Some(&id) = self.locals.get(name) {
+                    captures.insert(id);
+                    Expr2::Var(id)
+                } else {
+                    let builtin = match name.as_str() {
+                        "add" => BuiltinKind::Add,
+                        "sub" => BuiltinKind::Sub,
+                        "mul" => BuiltinKind::Mul,
+                        "div" => BuiltinKind::Div,
+                        "lt" => BuiltinKind::Lt,
+                        "gt" => BuiltinKind::Gt,
+                        "le" => BuiltinKind::Le,
+                        "ge" => BuiltinKind::Ge,
+                        "eq" => BuiltinKind::Eq,
+                        "ne" => BuiltinKind::Ne,
+                        "array_len" => BuiltinKind::ArrayLen,
+                        "array_init" => BuiltinKind::ArrayInit,
+                        "array_get" => BuiltinKind::ArrayGet,
+                        "array_set" => BuiltinKind::ArraySet,
+                        _ => panic!("Undefined variable: {}", name),
+                    };
+                    Expr2::Builtin(builtin)
+                }
+            }
+            Expr::Abs(params, body) => {
+                let mut inner_captures = HashSet::new();
+                let mut param_ids = Vec::new();
+                let mut stack = Vec::new();
+                for name in params {
+                    let id = self.fresh_local();
+                    param_ids.push(id);
+                    let old_binding = self.locals.insert(name.to_owned(), id);
+                    stack.push(old_binding);
+                }
+                let body = self.convert(body, &mut inner_captures);
+                for (old_binding, name) in stack.into_iter().zip(params).rev() {
+                    if let Some(old_binding) = old_binding {
+                        self.locals.insert(name.to_owned(), old_binding);
+                    } else {
+                        self.locals.remove(name);
+                    }
+                }
+                for &param_id in &param_ids {
+                    inner_captures.remove(&param_id);
+                }
+                for &c in &inner_captures {
+                    captures.insert(c);
+                }
+                let mut inner_captures = inner_captures.into_iter().collect::<Vec<_>>();
+                inner_captures.sort();
+                Expr2::Abs(param_ids, Box::new(body), inner_captures)
+            }
+            Expr::Call(callee, args) => {
+                let callee = self.convert(callee, captures);
+                let args = args
+                    .iter()
+                    .map(|arg| self.convert(arg, captures))
+                    .collect::<Vec<_>>();
+                Expr2::Call(Box::new(callee), args)
+            }
+            Expr::Cond(cond, then, else_) => {
+                let cond = self.convert(cond, captures);
+                let then = self.convert(then, captures);
+                let else_ = self.convert(else_, captures);
+                Expr2::Cond(Box::new(cond), Box::new(then), Box::new(else_))
+            }
+            Expr::Int(x) => Expr2::Int(*x),
+            Expr::Arr(elems) => Expr2::Arr(
+                elems
+                    .iter()
+                    .map(|elem| self.convert(elem, captures))
+                    .collect::<Vec<_>>(),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct FunDef {
+    num_args: usize,
+    num_locals: usize,
+    body: Vec<BasicBlock>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct BasicBlock {
+    middle: Vec<MInst>,
+    tail: TInst,
+}
+
+/// Middle instruction
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum MInst {
+    Read(usize),
+    Write(usize),
+    CCall(/** num_args */ usize),
+    Closure(/** num_capture */ usize, /** function id */ usize),
+    Int(i32),
+    Arr(/** len */ usize),
+    Builtin(BuiltinKind),
+}
+
+/// Tail instruction
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum TInst {
+    Ret,
+    Jump(/** target */ usize),
+    JumpIf(/** then-target */ usize, /** else-target */ usize),
+    TCCall,
+}
+
+#[derive(Debug)]
+struct Ctx3 {
+    functions: Vec<FunDef>,
+    current_function: FunDef,
+    current_function_idx: usize,
+    current_block: Vec<MInst>,
+    current_block_idx: usize,
+    local_map: HashMap<usize, usize>,
+}
+
+impl Ctx3 {
+    fn convert(&mut self, e: &Expr2) {
+        match e {
+            Expr2::Let(id, init, cont) => {
+                let local_index = *self.local_map.get(id).unwrap();
+                self.convert(init);
+                self.current_block.push(MInst::Write(local_index));
+                self.convert(cont);
+            }
+            Expr2::Var(id) => {
+                let local_index = *self.local_map.get(id).unwrap();
+                self.current_block.push(MInst::Read(local_index));
+            }
+            Expr2::Abs(params, body, captures) => todo!(),
+            Expr2::Call(callee, args) => {
+                self.convert(callee);
+                for arg in args {
+                    self.convert(arg);
+                }
+                self.current_block.push(MInst::CCall(args.len()));
+            }
+            Expr2::Cond(cond, then, else_) => {
+                self.convert(cond);
+                let start_block = self.steal_block();
+                self.fresh_block();
+                self.convert(then);
+                let then_block = self.steal_block();
+                self.fresh_block();
+                self.convert(else_);
+                let else_block = self.steal_block();
+                self.fresh_block();
+
+                self.finish_block(start_block, TInst::JumpIf(then_block.0, else_block.0));
+                self.finish_block(then_block, TInst::Jump(self.current_block_idx));
+                self.finish_block(else_block, TInst::Jump(self.current_block_idx));
+            }
+            Expr2::Int(n) => {
+                self.current_block.push(MInst::Int(*n));
+            }
+            Expr2::Arr(elems) => {
+                for elem in elems {
+                    self.convert(elem);
+                }
+                self.current_block.push(MInst::Arr(elems.len()));
+            }
+            Expr2::Builtin(builtin) => {
+                todo!()
+            }
+        }
+    }
+
+    fn fresh_block(&mut self) {
+        self.current_block_idx = self.current_function.body.len();
+        // Insert sentinel
+        self.current_function.body.push(BasicBlock {
+            middle: Vec::new(),
+            tail: TInst::Ret,
+        });
+    }
+    fn steal_block(&mut self) -> (usize, Vec<MInst>) {
+        let idx = mem::replace(&mut self.current_block_idx, usize::MAX);
+        let block = mem::replace(&mut self.current_block, Vec::new());
+        (idx, block)
+    }
+    fn finish_block(&mut self, block: (usize, Vec<MInst>), tail: TInst) {
+        self.current_function.body[block.0] = BasicBlock {
+            middle: block.1,
+            tail,
+        };
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum CExpr {
     Let(Box<CExpr>, Box<CExpr>),
     Var(usize, /** movable? */ bool),
