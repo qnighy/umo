@@ -166,27 +166,65 @@ enum TInst {
 #[derive(Debug)]
 struct Ctx3 {
     functions: Vec<FunDef>,
+}
+
+#[derive(Debug)]
+struct Ctx3F<'a> {
+    base: &'a mut Ctx3,
     current_function: FunDef,
     current_function_idx: usize,
-    current_block: Vec<MInst>,
-    current_block_idx: usize,
     local_map: HashMap<usize, usize>,
 }
 
-impl Ctx3 {
+#[derive(Debug)]
+struct Ctx3B<'a> {
+    func: &'a mut Ctx3F<'a>,
+    current_block: Vec<MInst>,
+    current_block_idx: usize,
+}
+
+impl Ctx3B<'_> {
     fn convert(&mut self, e: &Expr2) {
         match e {
             Expr2::Let(id, init, cont) => {
-                let local_index = *self.local_map.get(id).unwrap();
+                let local_index = *self.func.local_map.get(id).unwrap();
                 self.convert(init);
                 self.current_block.push(MInst::Write(local_index));
                 self.convert(cont);
             }
             Expr2::Var(id) => {
-                let local_index = *self.local_map.get(id).unwrap();
+                let local_index = *self.func.local_map.get(id).unwrap();
                 self.current_block.push(MInst::Read(local_index));
             }
-            Expr2::Abs(params, body, captures) => todo!(),
+            Expr2::Abs(params, body, captures) => {
+                let (num_locals, local_map) = Self::map_locals(body);
+                let current_function_idx = self.func.base.functions.len();
+                self.func.base.functions.push(FunDef {
+                    num_args: 0,
+                    num_locals: 0,
+                    body: Vec::new(),
+                });
+                let mut func = Ctx3F {
+                    base: &mut *self.func.base,
+                    current_function: FunDef {
+                        num_args: params.len(),
+                        num_locals,
+                        body: vec![BasicBlock {
+                            middle: Vec::new(),
+                            tail: TInst::Ret,
+                        }],
+                    },
+                    current_function_idx,
+                    local_map,
+                };
+                Ctx3B {
+                    func: &mut func,
+                    current_block: Vec::new(),
+                    current_block_idx: 0,
+                }
+                .convert(body);
+                todo!();
+            }
             Expr2::Call(callee, args) => {
                 self.convert(callee);
                 for arg in args {
@@ -225,9 +263,9 @@ impl Ctx3 {
     }
 
     fn fresh_block(&mut self) {
-        self.current_block_idx = self.current_function.body.len();
+        self.current_block_idx = self.func.current_function.body.len();
         // Insert sentinel
-        self.current_function.body.push(BasicBlock {
+        self.func.current_function.body.push(BasicBlock {
             middle: Vec::new(),
             tail: TInst::Ret,
         });
@@ -238,10 +276,51 @@ impl Ctx3 {
         (idx, block)
     }
     fn finish_block(&mut self, block: (usize, Vec<MInst>), tail: TInst) {
-        self.current_function.body[block.0] = BasicBlock {
+        self.func.current_function.body[block.0] = BasicBlock {
             middle: block.1,
             tail,
         };
+    }
+
+    fn map_locals(e: &Expr2) -> (usize, HashMap<usize, usize>) {
+        let mut num_locals = 0;
+        let mut local_map = HashMap::new();
+        Self::collect_locals(e, &mut num_locals, &mut local_map);
+        (num_locals, local_map)
+    }
+
+    fn collect_locals(e: &Expr2, num_locals: &mut usize, local_map: &mut HashMap<usize, usize>) {
+        match e {
+            Expr2::Let(id, init, cont) => {
+                local_map.entry(*id).or_insert_with(|| {
+                    let local_id = *num_locals;
+                    *num_locals += 1;
+                    local_id
+                });
+                Self::collect_locals(init, num_locals, local_map);
+                Self::collect_locals(cont, num_locals, local_map);
+            }
+            Expr2::Var(_) => { /* do nothing */ }
+            Expr2::Abs(_, _, _) => { /* do nothing */ }
+            Expr2::Call(callee, args) => {
+                Self::collect_locals(callee, num_locals, local_map);
+                for arg in args {
+                    Self::collect_locals(arg, num_locals, local_map);
+                }
+            }
+            Expr2::Cond(cond, then, else_) => {
+                Self::collect_locals(cond, num_locals, local_map);
+                Self::collect_locals(then, num_locals, local_map);
+                Self::collect_locals(else_, num_locals, local_map);
+            }
+            Expr2::Int(_) => {}
+            Expr2::Arr(elems) => {
+                for elem in elems {
+                    Self::collect_locals(elem, num_locals, local_map);
+                }
+            }
+            Expr2::Builtin(_) => todo!(),
+        }
     }
 }
 
