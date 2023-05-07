@@ -1,7 +1,5 @@
-use std::{
-    collections::{HashMap, HashSet},
-    mem,
-};
+use std::collections::{HashMap, HashSet};
+use std::mem;
 
 use crate::ast::Expr;
 
@@ -725,4 +723,122 @@ pub fn value_string(v: &Value) -> String {
         .collect::<Option<Vec<_>>>()
         .unwrap_or_else(|| panic!("Not a string: {:?}", v));
     String::from_utf8_lossy(&v).into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parsing::parse;
+
+    use super::*;
+    #[test]
+    fn test_convert2() {
+        let e = parse(
+            "
+            let y = (f) =>
+                ((g) => f((x) => g(g)(x)))
+                ((g) => f((x) => g(g)(x))) in
+            let fib = y((fib) => (n) =>
+                if le(n, 1) {
+                    n
+                } else {
+                    add(fib(sub(n, 1)), fib(sub(n, 2)))
+                }
+            ) in
+            let x = fib(11) in
+            [x]
+        ",
+        );
+        let mut ctx2 = Ctx2::default();
+        let e2_expect = Expr2::Let(
+            0,
+            Box::new(Expr2::Abs(
+                vec![1],
+                Box::new(Expr2::Call(
+                    Box::new(Expr2::Abs(
+                        vec![2],
+                        Box::new(Expr2::Call(
+                            Box::new(Expr2::Var(1)),
+                            vec![Expr2::Abs(
+                                vec![3],
+                                Box::new(Expr2::Call(
+                                    Box::new(Expr2::Call(
+                                        Box::new(Expr2::Var(2)),
+                                        vec![Expr2::Var(2)],
+                                    )),
+                                    vec![Expr2::Var(3)],
+                                )),
+                                vec![2],
+                            )],
+                        )),
+                        vec![1],
+                    )),
+                    vec![Expr2::Abs(
+                        vec![4],
+                        Box::new(Expr2::Call(
+                            Box::new(Expr2::Var(1)),
+                            vec![Expr2::Abs(
+                                vec![5],
+                                Box::new(Expr2::Call(
+                                    Box::new(Expr2::Call(
+                                        Box::new(Expr2::Var(4)),
+                                        vec![Expr2::Var(4)],
+                                    )),
+                                    vec![Expr2::Var(5)],
+                                )),
+                                vec![4],
+                            )],
+                        )),
+                        vec![1],
+                    )],
+                )),
+                vec![],
+            )),
+            Box::new(Expr2::Let(
+                6,
+                Box::new(Expr2::Call(
+                    Box::new(Expr2::Var(0)),
+                    vec![Expr2::Abs(
+                        vec![7],
+                        Box::new(Expr2::Abs(
+                            vec![8],
+                            Box::new(Expr2::Cond(
+                                Box::new(Expr2::Call(
+                                    Box::new(Expr2::Builtin(BuiltinKind::Le)),
+                                    vec![Expr2::Var(8), Expr2::Int(1)],
+                                )),
+                                Box::new(Expr2::Var(8)),
+                                Box::new(Expr2::Call(
+                                    Box::new(Expr2::Builtin(BuiltinKind::Add)),
+                                    vec![
+                                        Expr2::Call(
+                                            Box::new(Expr2::Var(7)),
+                                            vec![Expr2::Call(
+                                                Box::new(Expr2::Builtin(BuiltinKind::Sub)),
+                                                vec![Expr2::Var(8), Expr2::Int(1)],
+                                            )],
+                                        ),
+                                        Expr2::Call(
+                                            Box::new(Expr2::Var(7)),
+                                            vec![Expr2::Call(
+                                                Box::new(Expr2::Builtin(BuiltinKind::Sub)),
+                                                vec![Expr2::Var(8), Expr2::Int(2)],
+                                            )],
+                                        ),
+                                    ],
+                                )),
+                            )),
+                            vec![7],
+                        )),
+                        vec![],
+                    )],
+                )),
+                Box::new(Expr2::Let(
+                    9,
+                    Box::new(Expr2::Call(Box::new(Expr2::Var(6)), vec![Expr2::Int(11)])),
+                    Box::new(Expr2::Arr(vec![Expr2::Var(9)])),
+                )),
+            )),
+        );
+        assert_eq!(ctx2.convert(&e, &mut HashSet::new()), e2_expect);
+    }
 }
