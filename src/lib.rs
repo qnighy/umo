@@ -6,6 +6,7 @@ use crate::parsing::parse;
 pub mod ast;
 mod eval;
 mod parsing;
+mod vm_v1;
 
 pub fn exec(text: &str) -> String {
     value_string(&eval(&parse(text)))

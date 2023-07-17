@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use crate::ast::Expr;
+use crate::vm_v1::{BasicBlock, FunDef, MInst, TInst};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Expr2 {
@@ -125,40 +126,6 @@ impl Ctx2 {
             ),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct FunDef {
-    num_args: usize,
-    num_locals: usize,
-    body: Vec<BasicBlock>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct BasicBlock {
-    middle: Vec<MInst>,
-    tail: TInst,
-}
-
-/// Middle instruction
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum MInst {
-    Read(usize),
-    Write(usize),
-    CCall(/** num_args */ usize),
-    Closure(/** num_capture */ usize, /** function id */ usize),
-    Int(i32),
-    Arr(/** len */ usize),
-    Builtin(BuiltinKind),
-}
-
-/// Tail instruction
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum TInst {
-    Ret,
-    Jump(/** target */ usize),
-    JumpIf(/** then-target */ usize, /** else-target */ usize),
-    TCCall,
 }
 
 #[derive(Debug)]
