@@ -1,6 +1,6 @@
 use std::str;
 
-use crate::ast::Expr;
+use crate::old::ast::Expr;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Token {
