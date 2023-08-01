@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+use umo::rt_ctx::RtCtxImpl;
+
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -10,5 +12,5 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    umo::run(&args.source);
+    umo::run(&RtCtxImpl, &args.source);
 }
