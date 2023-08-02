@@ -9,7 +9,7 @@ pub mod testing;
 pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
     let source = fs::read_to_string(source_path).unwrap();
     if source == "use lang::\"0.0.1\";\nputs(\"Hello, world!\");\n" {
-        sir::eval(ctx, &sir::Inst::Puts);
+        sir::eval(ctx, &sir::BasicBlock::new(vec![sir::Inst::Puts]));
     } else {
         todo!("Proper parsing and execution");
     }
