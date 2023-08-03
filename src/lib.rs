@@ -9,7 +9,20 @@ pub mod testing;
 pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
     let source = fs::read_to_string(source_path).unwrap();
     if source == "use lang::\"0.0.1\";\nputs(\"Hello, world!\");\n" {
-        sir::eval(ctx, &sir::BasicBlock::new(vec![sir::Inst::Puts]));
+        sir::eval(
+            ctx,
+            &sir::BasicBlock::new(
+                1,
+                vec![
+                    sir::Inst::StringLiteral {
+                        lhs: 0,
+                        value: "Hello, world!".to_string(),
+                    },
+                    sir::Inst::PushArg { value_ref: 0 },
+                    sir::Inst::Puts,
+                ],
+            ),
+        );
     } else {
         todo!("Proper parsing and execution");
     }
@@ -24,7 +37,6 @@ mod tests {
     #[test]
     fn test_run_hello() {
         let source_path = std::path::Path::new("examples/hello.umo");
-        // use ctx from crate::testing
         let ctx = MockRtCtx::new();
         run(&ctx, source_path);
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
