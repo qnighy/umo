@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 pub mod old;
 pub mod rt_ctx;
@@ -16,7 +17,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                 vec![
                     sir::Inst::StringLiteral {
                         lhs: 0,
-                        value: "Hello, world!".to_string(),
+                        value: Arc::new("Hello, world!".to_string()),
                     },
                     sir::Inst::PushArg { value_ref: 0 },
                     sir::Inst::Puts,

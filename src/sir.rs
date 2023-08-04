@@ -3,6 +3,7 @@
 use crate::rt_ctx::RtCtx;
 
 use std::mem;
+use std::sync::Arc;
 
 // Define BasicBlock
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -20,7 +21,7 @@ impl BasicBlock {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Inst {
-    StringLiteral { lhs: usize, value: String },
+    StringLiteral { lhs: usize, value: Arc<String> },
     PushArg { value_ref: usize },
     Puts,
 }
@@ -33,7 +34,7 @@ struct State {
 
 pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
     let mut state = State {
-        vars: vec![Value::String(String::new()); bb.num_vars],
+        vars: vec![Value::String(Arc::new(String::new())); bb.num_vars],
         args: vec![],
     };
     for inst in &bb.insts {
@@ -61,7 +62,7 @@ pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Value {
-    String(String),
+    String(Arc<String>),
 }
 
 #[cfg(test)]
@@ -80,7 +81,7 @@ mod tests {
                 vec![
                     Inst::StringLiteral {
                         lhs: 0,
-                        value: "Hello, world!".to_string(),
+                        value: Arc::new("Hello, world!".to_string()),
                     },
                     Inst::PushArg { value_ref: 0 },
                     Inst::Puts,
