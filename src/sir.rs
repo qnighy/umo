@@ -43,7 +43,7 @@ pub enum InstKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct State {
-    vars: Vec<Value>,
+    vars: Vec<Option<Value>>,
     args: Vec<Value>,
 }
 
@@ -158,20 +158,20 @@ pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
 }
 fn eval1(ctx: &dyn RtCtx, bb: &BasicBlock) {
     let mut state = State {
-        vars: vec![Value::String(Arc::new(String::new())); bb.num_vars],
+        vars: vec![None; bb.num_vars],
         args: vec![],
     };
     for inst in &bb.insts {
         match &inst.kind {
             InstKind::Copy { lhs, rhs } => {
-                state.vars[*lhs] = state.vars[*rhs].clone();
+                state.vars[*lhs] = Some(state.vars[*rhs].as_ref().unwrap().clone());
             }
             InstKind::StringLiteral { lhs, value } => {
-                state.vars[*lhs] = Value::String(value.clone());
+                state.vars[*lhs] = Some(Value::String(value.clone()));
             }
             InstKind::PushArg { value_ref } => {
-                let value = &state.vars[*value_ref];
-                state.args.push(value.clone());
+                let value = state.vars[*value_ref].take().unwrap();
+                state.args.push(value);
             }
             InstKind::Puts => {
                 let args = mem::replace(&mut state.args, vec![]);
