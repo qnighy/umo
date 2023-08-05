@@ -1,5 +1,6 @@
 // SIR -- Sequential Intermediate Representation
 
+use crate::cctx::CCtx;
 use crate::rt_ctx::RtCtx;
 
 use std::mem;
@@ -32,7 +33,16 @@ struct State {
     args: Vec<Value>,
 }
 
+pub fn compile(cctx: &CCtx, input: &BasicBlock) -> BasicBlock {
+    input.clone()
+}
+
 pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
+    let cctx = CCtx::new();
+    let bb = compile(&cctx, bb);
+    eval1(ctx, &bb)
+}
+fn eval1(ctx: &dyn RtCtx, bb: &BasicBlock) {
     let mut state = State {
         vars: vec![Value::String(Arc::new(String::new())); bb.num_vars],
         args: vec![],
