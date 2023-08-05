@@ -110,55 +110,41 @@ fn replace_moved_rhs(bb: &mut Inst, to: usize) {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use crate::sir::testing::{insts, BasicBlockTestingExt};
 
     use super::*;
 
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let bb = BasicBlock::new(
-            1,
+        let bb = BasicBlock::describe(|(x,)| {
             vec![
-                Inst::new(InstKind::StringLiteral {
-                    lhs: 0,
-                    value: Arc::new("Hello, world!".to_string()),
-                }),
-                Inst::new(InstKind::PushArg { value_ref: 0 }),
-                Inst::new(InstKind::Puts),
-                Inst::new(InstKind::PushArg { value_ref: 0 }),
-                Inst::new(InstKind::Puts),
-                Inst::new(InstKind::StringLiteral {
-                    lhs: 0,
-                    value: Arc::new("Hello, world!".to_string()),
-                }),
-                Inst::new(InstKind::PushArg { value_ref: 0 }),
-                Inst::new(InstKind::Puts),
-            ],
-        );
+                insts::string_literal(x, "Hello, world!"),
+                insts::push_arg(x),
+                insts::puts(),
+                insts::push_arg(x),
+                insts::puts(),
+                insts::string_literal(x, "Hello, world!"),
+                insts::push_arg(x),
+                insts::puts(),
+            ]
+        });
         let bb = compile(&cctx, &bb);
         assert_eq!(
             bb,
-            BasicBlock::new(
-                2,
+            BasicBlock::describe(|(x, tmp1)| {
                 vec![
-                    Inst::new(InstKind::StringLiteral {
-                        lhs: 0,
-                        value: Arc::new("Hello, world!".to_string()),
-                    }),
-                    Inst::new(InstKind::Copy { lhs: 1, rhs: 0 }),
-                    Inst::new(InstKind::PushArg { value_ref: 1 }),
-                    Inst::new(InstKind::Puts),
-                    Inst::new(InstKind::PushArg { value_ref: 0 }),
-                    Inst::new(InstKind::Puts),
-                    Inst::new(InstKind::StringLiteral {
-                        lhs: 0,
-                        value: Arc::new("Hello, world!".to_string()),
-                    }),
-                    Inst::new(InstKind::PushArg { value_ref: 0 }),
-                    Inst::new(InstKind::Puts),
-                ],
-            )
+                    insts::string_literal(x, "Hello, world!"),
+                    insts::copy(tmp1, x),
+                    insts::push_arg(tmp1),
+                    insts::puts(),
+                    insts::push_arg(x),
+                    insts::puts(),
+                    insts::string_literal(x, "Hello, world!"),
+                    insts::push_arg(x),
+                    insts::puts(),
+                ]
+            })
         );
     }
 }

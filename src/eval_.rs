@@ -12,11 +12,9 @@ pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::*;
 
-    use crate::sir::{Inst, InstKind};
+    use crate::sir::testing::{insts, BasicBlockTestingExt};
     use crate::testing::MockRtCtx;
 
     #[test]
@@ -24,17 +22,13 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &BasicBlock::new(
-                1,
+            &BasicBlock::describe(|(x,)| {
                 vec![
-                    Inst::new(InstKind::StringLiteral {
-                        lhs: 0,
-                        value: Arc::new("Hello, world!".to_string()),
-                    }),
-                    Inst::new(InstKind::PushArg { value_ref: 0 }),
-                    Inst::new(InstKind::Puts),
-                ],
-            ),
+                    insts::string_literal(x, "Hello, world!"),
+                    insts::push_arg(x),
+                    insts::puts(),
+                ]
+            }),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
     }

@@ -35,3 +35,46 @@ pub enum InstKind {
     PushArg { value_ref: usize },
     Puts,
 }
+
+#[cfg(test)]
+pub mod testing {
+    use crate::sir::{BasicBlock, Inst};
+    use crate::testing::SeqGen;
+
+    pub trait BasicBlockTestingExt {
+        fn describe<T, F>(f: F) -> Self
+        where
+            T: SeqGen,
+            F: FnOnce(T) -> Vec<Inst>;
+    }
+
+    impl BasicBlockTestingExt for BasicBlock {
+        fn describe<T, F>(f: F) -> Self
+        where
+            T: SeqGen,
+            F: FnOnce(T) -> Vec<Inst>,
+        {
+            let insts = f(T::seq());
+            Self::new(T::size(), insts)
+        }
+    }
+
+    pub mod insts {
+        use crate::sir::{Inst, InstKind};
+        pub fn copy(lhs: usize, rhs: usize) -> Inst {
+            Inst::new(InstKind::Copy { lhs, rhs })
+        }
+        pub fn string_literal(lhs: usize, value: &str) -> Inst {
+            Inst::new(InstKind::StringLiteral {
+                lhs,
+                value: std::sync::Arc::new(value.to_owned()),
+            })
+        }
+        pub fn push_arg(value_ref: usize) -> Inst {
+            Inst::new(InstKind::PushArg { value_ref })
+        }
+        pub fn puts() -> Inst {
+            Inst::new(InstKind::Puts)
+        }
+    }
+}
