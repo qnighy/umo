@@ -3,15 +3,18 @@ use std::path::Path;
 use std::sync::Arc;
 
 mod cctx;
+mod eval_;
 pub mod old;
 pub mod rt_ctx;
 mod sir;
+mod sir_compile;
+mod sir_eval;
 pub mod testing;
 
 pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
     let source = fs::read_to_string(source_path).unwrap();
     if source == "use lang::\"0.0.1\";\nputs(\"Hello, world!\");\n" {
-        sir::eval(
+        eval_::eval(
             ctx,
             &sir::BasicBlock::new(
                 1,
