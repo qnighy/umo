@@ -21,7 +21,19 @@ impl BasicBlock {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Inst {
+pub struct Inst {
+    pub id: usize,
+    pub kind: InstKind,
+}
+
+impl Inst {
+    pub fn new(kind: InstKind) -> Self {
+        Self { id: 0, kind }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum InstKind {
     StringLiteral { lhs: usize, value: Arc<String> },
     PushArg { value_ref: usize },
     Puts,
@@ -34,7 +46,15 @@ struct State {
 }
 
 pub fn compile(cctx: &CCtx, input: &BasicBlock) -> BasicBlock {
+    let mut input = input.clone();
+    assign_id(cctx, &mut input);
     input.clone()
+}
+
+fn assign_id(cctx: &CCtx, bb: &mut BasicBlock) {
+    for inst in &mut bb.insts {
+        inst.id = cctx.id_gen.fresh();
+    }
 }
 
 pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
@@ -48,15 +68,15 @@ fn eval1(ctx: &dyn RtCtx, bb: &BasicBlock) {
         args: vec![],
     };
     for inst in &bb.insts {
-        match inst {
-            Inst::StringLiteral { lhs, value } => {
+        match &inst.kind {
+            InstKind::StringLiteral { lhs, value } => {
                 state.vars[*lhs] = Value::String(value.clone());
             }
-            Inst::PushArg { value_ref } => {
+            InstKind::PushArg { value_ref } => {
                 let value = &state.vars[*value_ref];
                 state.args.push(value.clone());
             }
-            Inst::Puts => {
+            InstKind::Puts => {
                 let args = mem::replace(&mut state.args, vec![]);
                 assert_eq!(args.len(), 1);
                 #[allow(irrefutable_let_patterns)]
@@ -89,12 +109,12 @@ mod tests {
             &BasicBlock::new(
                 1,
                 vec![
-                    Inst::StringLiteral {
+                    Inst::new(InstKind::StringLiteral {
                         lhs: 0,
                         value: Arc::new("Hello, world!".to_string()),
-                    },
-                    Inst::PushArg { value_ref: 0 },
-                    Inst::Puts,
+                    }),
+                    Inst::new(InstKind::PushArg { value_ref: 0 }),
+                    Inst::new(InstKind::Puts),
                 ],
             ),
         );

@@ -16,12 +16,12 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
             &sir::BasicBlock::new(
                 1,
                 vec![
-                    sir::Inst::StringLiteral {
+                    sir::Inst::new(sir::InstKind::StringLiteral {
                         lhs: 0,
                         value: Arc::new("Hello, world!".to_string()),
-                    },
-                    sir::Inst::PushArg { value_ref: 0 },
-                    sir::Inst::Puts,
+                    }),
+                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
+                    sir::Inst::new(sir::InstKind::Puts),
                 ],
             ),
         );
