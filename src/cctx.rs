@@ -28,9 +28,16 @@ impl IdGen {
         }
     }
 
-    pub fn fresh(&self) -> usize {
-        self.next_id.fetch_add(1, atomic::Ordering::Relaxed)
+    pub fn fresh(&self) -> Id {
+        Id {
+            number: self.next_id.fetch_add(1, atomic::Ordering::Relaxed),
+        }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Id {
+    pub number: usize,
 }
 
 #[cfg(test)]
@@ -40,8 +47,8 @@ mod tests {
     #[test]
     fn test_id_gen() {
         let id_gen = IdGen::new();
-        assert_eq!(id_gen.fresh(), 0);
-        assert_eq!(id_gen.fresh(), 1);
-        assert_eq!(id_gen.fresh(), 2);
+        assert_eq!(id_gen.fresh(), Id { number: 0 });
+        assert_eq!(id_gen.fresh(), Id { number: 1 });
+        assert_eq!(id_gen.fresh(), Id { number: 2 });
     }
 }

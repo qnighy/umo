@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::mem;
 
-use crate::cctx::CCtx;
+use crate::cctx::{CCtx, Id};
 use crate::sir::{BasicBlock, Inst, InstKind};
 
 pub fn compile(cctx: &CCtx, bb: &BasicBlock) -> BasicBlock {
@@ -21,11 +21,11 @@ fn assign_id(cctx: &CCtx, bb: &mut BasicBlock) {
 
 fn unassign_id(bb: &mut BasicBlock) {
     for inst in &mut bb.insts {
-        inst.id = 0;
+        inst.id = Id::default();
     }
 }
 
-fn liveness(_cctx: &CCtx, bb: &BasicBlock) -> HashMap<usize, HashSet<usize>> {
+fn liveness(_cctx: &CCtx, bb: &BasicBlock) -> HashMap<Id, HashSet<usize>> {
     let mut live_in = HashMap::new();
     let mut i = bb.insts.len();
     let mut alive = HashSet::new();
@@ -49,7 +49,7 @@ fn liveness(_cctx: &CCtx, bb: &BasicBlock) -> HashMap<usize, HashSet<usize>> {
     live_in
 }
 
-fn insert_copy(_cctx: &CCtx, bb: &mut BasicBlock, live_in: &HashMap<usize, HashSet<usize>>) {
+fn insert_copy(_cctx: &CCtx, bb: &mut BasicBlock, live_in: &HashMap<Id, HashSet<usize>>) {
     let mut copied_var_for = HashMap::new();
     for (i, inst) in bb.insts.iter().enumerate() {
         let rhs = moved_rhs_of(inst);

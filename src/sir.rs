@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use crate::cctx::Id;
+
 // Define BasicBlock
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BasicBlock {
@@ -18,13 +20,16 @@ impl BasicBlock {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Inst {
-    pub id: usize,
+    pub id: Id,
     pub kind: InstKind,
 }
 
 impl Inst {
     pub fn new(kind: InstKind) -> Self {
-        Self { id: 0, kind }
+        Self {
+            id: Id::default(),
+            kind,
+        }
     }
 }
 
