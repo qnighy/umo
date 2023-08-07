@@ -38,6 +38,11 @@ pub enum InstKind {
     Copy { lhs: usize, rhs: usize },
     StringLiteral { lhs: usize, value: Arc<String> },
     PushArg { value_ref: usize },
+    CallBuiltin(BuiltinKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BuiltinKind {
     Puts,
 }
 
@@ -65,7 +70,7 @@ pub mod testing {
     }
 
     pub mod insts {
-        use crate::sir::{Inst, InstKind};
+        use crate::sir::{BuiltinKind, Inst, InstKind};
         pub fn copy(lhs: usize, rhs: usize) -> Inst {
             Inst::new(InstKind::Copy { lhs, rhs })
         }
@@ -79,7 +84,7 @@ pub mod testing {
             Inst::new(InstKind::PushArg { value_ref })
         }
         pub fn puts() -> Inst {
-            Inst::new(InstKind::Puts)
+            Inst::new(InstKind::CallBuiltin(BuiltinKind::Puts))
         }
     }
 }

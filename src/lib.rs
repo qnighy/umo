@@ -24,7 +24,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         value: Arc::new("Hello, world!".to_string()),
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
-                    sir::Inst::new(sir::InstKind::Puts),
+                    sir::Inst::new(sir::InstKind::CallBuiltin(sir::BuiltinKind::Puts)),
                 ],
             ),
         );

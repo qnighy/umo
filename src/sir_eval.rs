@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::Arc;
 
 use crate::rt_ctx::RtCtx;
-use crate::sir::{BasicBlock, InstKind};
+use crate::sir::{BasicBlock, BuiltinKind, InstKind};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct State {
@@ -27,16 +27,26 @@ pub fn eval1(ctx: &dyn RtCtx, bb: &BasicBlock) {
                 let value = state.vars[*value_ref].take().unwrap();
                 state.args.push(value);
             }
-            InstKind::Puts => {
+            InstKind::CallBuiltin(f) => {
                 let args = mem::replace(&mut state.args, vec![]);
-                assert_eq!(args.len(), 1);
-                #[allow(irrefutable_let_patterns)]
-                if let Value::String(s) = &args[0] {
-                    ctx.puts(s);
-                } else {
-                    panic!("Expected string");
-                }
+                eval_builtin(ctx, *f, args);
             }
+        }
+    }
+}
+
+fn eval_builtin(ctx: &dyn RtCtx, f: BuiltinKind, args: Vec<Value>) -> Value {
+    match f {
+        BuiltinKind::Puts => {
+            assert_eq!(args.len(), 1);
+            #[allow(irrefutable_let_patterns)]
+            if let Value::String(s) = &args[0] {
+                ctx.puts(s);
+            } else {
+                panic!("Expected string");
+            }
+            // TODO: replace with unit
+            Value::String(Arc::new("".to_string()))
         }
     }
 }
