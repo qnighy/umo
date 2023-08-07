@@ -36,7 +36,7 @@ fn liveness(_cctx: &CCtx, bb: &BasicBlock) -> HashMap<Id, HashSet<usize>> {
                 alive.remove(lhs);
                 alive.insert(*rhs);
             }
-            InstKind::StringLiteral { lhs, .. } => {
+            InstKind::Literal { lhs, .. } => {
                 alive.remove(lhs);
             }
             InstKind::PushArg { value_ref } => {
@@ -85,7 +85,7 @@ fn insert_copy(_cctx: &CCtx, bb: &mut BasicBlock, live_in: &HashMap<Id, HashSet<
 fn moved_rhs_of(bb: &Inst) -> Option<usize> {
     match &bb.kind {
         InstKind::Copy { .. } => None,
-        InstKind::StringLiteral { .. } => None,
+        InstKind::Literal { .. } => None,
         InstKind::PushArg { value_ref } => Some(*value_ref),
         InstKind::CallBuiltin(_) => None,
     }
@@ -96,7 +96,7 @@ fn replace_moved_rhs(bb: &mut Inst, to: usize) {
         InstKind::Copy { .. } => {
             unreachable!();
         }
-        InstKind::StringLiteral { .. } => {
+        InstKind::Literal { .. } => {
             unreachable!();
         }
         InstKind::PushArg { value_ref } => {

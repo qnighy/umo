@@ -36,14 +36,22 @@ impl Inst {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InstKind {
     Copy { lhs: usize, rhs: usize },
-    StringLiteral { lhs: usize, value: Arc<String> },
+    Literal { lhs: usize, value: Literal },
     PushArg { value_ref: usize },
     CallBuiltin(BuiltinKind),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Literal {
+    // TODO: use BigInt
+    Integer(i32),
+    String(Arc<String>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BuiltinKind {
     Puts,
+    Puti,
 }
 
 #[cfg(test)]
@@ -70,14 +78,22 @@ pub mod testing {
     }
 
     pub mod insts {
-        use crate::sir::{BuiltinKind, Inst, InstKind};
+        use crate::sir::{BuiltinKind, Inst, InstKind, Literal};
+        use std::sync::Arc;
         pub fn copy(lhs: usize, rhs: usize) -> Inst {
             Inst::new(InstKind::Copy { lhs, rhs })
         }
-        pub fn string_literal(lhs: usize, value: &str) -> Inst {
-            Inst::new(InstKind::StringLiteral {
+        #[allow(unused)]
+        pub fn integer_literal(lhs: usize, value: i32) -> Inst {
+            Inst::new(InstKind::Literal {
                 lhs,
-                value: std::sync::Arc::new(value.to_owned()),
+                value: Literal::Integer(value),
+            })
+        }
+        pub fn string_literal(lhs: usize, value: &str) -> Inst {
+            Inst::new(InstKind::Literal {
+                lhs,
+                value: Literal::String(Arc::new(value.to_owned())),
             })
         }
         pub fn push_arg(value_ref: usize) -> Inst {
@@ -85,6 +101,10 @@ pub mod testing {
         }
         pub fn puts() -> Inst {
             Inst::new(InstKind::CallBuiltin(BuiltinKind::Puts))
+        }
+        #[allow(unused)]
+        pub fn puti() -> Inst {
+            Inst::new(InstKind::CallBuiltin(BuiltinKind::Puti))
         }
     }
 }

@@ -19,12 +19,28 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
             &sir::BasicBlock::new(
                 1,
                 vec![
-                    sir::Inst::new(sir::InstKind::StringLiteral {
+                    sir::Inst::new(sir::InstKind::Literal {
                         lhs: 0,
-                        value: Arc::new("Hello, world!".to_string()),
+                        value: sir::Literal::String(Arc::new("Hello, world!".to_string())),
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
                     sir::Inst::new(sir::InstKind::CallBuiltin(sir::BuiltinKind::Puts)),
+                ],
+            ),
+        );
+    } else if source == "use lang::\"0.0.1\";\nputi(1 + 1);\n" {
+        eval_::eval(
+            ctx,
+            &sir::BasicBlock::new(
+                1,
+                vec![
+                    // TODO: do not reduce 1 + 1
+                    sir::Inst::new(sir::InstKind::Literal {
+                        lhs: 0,
+                        value: sir::Literal::Integer(2),
+                    }),
+                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
+                    sir::Inst::new(sir::InstKind::CallBuiltin(sir::BuiltinKind::Puti)),
                 ],
             ),
         );

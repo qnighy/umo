@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::Arc;
 
 use crate::rt_ctx::RtCtx;
-use crate::sir::{BasicBlock, BuiltinKind, InstKind};
+use crate::sir::{BasicBlock, BuiltinKind, InstKind, Literal};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct State {
@@ -20,8 +20,8 @@ pub fn eval1(ctx: &dyn RtCtx, bb: &BasicBlock) {
             InstKind::Copy { lhs, rhs } => {
                 state.vars[*lhs] = Some(state.vars[*rhs].as_ref().unwrap().clone());
             }
-            InstKind::StringLiteral { lhs, value } => {
-                state.vars[*lhs] = Some(Value::String(value.clone()));
+            InstKind::Literal { lhs, value } => {
+                state.vars[*lhs] = Some(Value::from(value.clone()));
             }
             InstKind::PushArg { value_ref } => {
                 let value = state.vars[*value_ref].take().unwrap();
@@ -39,14 +39,21 @@ fn eval_builtin(ctx: &dyn RtCtx, f: BuiltinKind, args: Vec<Value>) -> Value {
     match f {
         BuiltinKind::Puts => {
             assert_eq!(args.len(), 1);
-            #[allow(irrefutable_let_patterns)]
             if let Value::String(s) = &args[0] {
                 ctx.puts(s);
             } else {
                 panic!("Expected string");
             }
-            // TODO: replace with unit
-            Value::String(Arc::new("".to_string()))
+            Value::Integer(0)
+        }
+        BuiltinKind::Puti => {
+            assert_eq!(args.len(), 1);
+            if let Value::Integer(i) = &args[0] {
+                ctx.puts(&i.to_string());
+            } else {
+                panic!("Expected integer");
+            }
+            Value::Integer(0)
         }
     }
 }
@@ -54,4 +61,14 @@ fn eval_builtin(ctx: &dyn RtCtx, f: BuiltinKind, args: Vec<Value>) -> Value {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Value {
     String(Arc<String>),
+    Integer(i32),
+}
+
+impl From<Literal> for Value {
+    fn from(l: Literal) -> Self {
+        match l {
+            Literal::String(s) => Value::String(s),
+            Literal::Integer(i) => Value::Integer(i),
+        }
+    }
 }
