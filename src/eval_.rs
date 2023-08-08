@@ -3,9 +3,11 @@ use crate::rt_ctx::RtCtx;
 use crate::sir::BasicBlock;
 use crate::sir_compile::compile;
 use crate::sir_eval::eval1;
+use crate::sir_typecheck::typecheck;
 
 pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
     let cctx = CCtx::new();
+    typecheck(&cctx, bb).unwrap();
     let bb = compile(&cctx, bb);
     eval1(ctx, &bb)
 }

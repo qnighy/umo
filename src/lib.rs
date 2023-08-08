@@ -9,6 +9,7 @@ pub mod rt_ctx;
 mod sir;
 mod sir_compile;
 mod sir_eval;
+mod sir_typecheck;
 pub mod testing;
 
 pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
