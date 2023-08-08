@@ -35,10 +35,21 @@ impl Inst {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InstKind {
-    Copy { lhs: usize, rhs: usize },
-    Literal { lhs: usize, value: Literal },
-    PushArg { value_ref: usize },
-    CallBuiltin(BuiltinKind),
+    Copy {
+        lhs: usize,
+        rhs: usize,
+    },
+    Literal {
+        lhs: usize,
+        value: Literal,
+    },
+    PushArg {
+        value_ref: usize,
+    },
+    CallBuiltin {
+        lhs: Option<usize>,
+        builtin: BuiltinKind,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -50,6 +61,7 @@ pub enum Literal {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BuiltinKind {
+    Add,
     Puts,
     Puti,
 }
@@ -83,7 +95,6 @@ pub mod testing {
         pub fn copy(lhs: usize, rhs: usize) -> Inst {
             Inst::new(InstKind::Copy { lhs, rhs })
         }
-        #[allow(unused)]
         pub fn integer_literal(lhs: usize, value: i32) -> Inst {
             Inst::new(InstKind::Literal {
                 lhs,
@@ -99,12 +110,23 @@ pub mod testing {
         pub fn push_arg(value_ref: usize) -> Inst {
             Inst::new(InstKind::PushArg { value_ref })
         }
-        pub fn puts() -> Inst {
-            Inst::new(InstKind::CallBuiltin(BuiltinKind::Puts))
+        pub fn add(lhs: usize) -> Inst {
+            Inst::new(InstKind::CallBuiltin {
+                lhs: Some(lhs),
+                builtin: BuiltinKind::Add,
+            })
         }
-        #[allow(unused)]
+        pub fn puts() -> Inst {
+            Inst::new(InstKind::CallBuiltin {
+                lhs: None,
+                builtin: BuiltinKind::Puts,
+            })
+        }
         pub fn puti() -> Inst {
-            Inst::new(InstKind::CallBuiltin(BuiltinKind::Puti))
+            Inst::new(InstKind::CallBuiltin {
+                lhs: None,
+                builtin: BuiltinKind::Puti,
+            })
         }
     }
 }

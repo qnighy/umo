@@ -25,7 +25,10 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         value: sir::Literal::String(Arc::new("Hello, world!".to_string())),
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
-                    sir::Inst::new(sir::InstKind::CallBuiltin(sir::BuiltinKind::Puts)),
+                    sir::Inst::new(sir::InstKind::CallBuiltin {
+                        lhs: None,
+                        builtin: sir::BuiltinKind::Puts,
+                    }),
                 ],
             ),
         );
@@ -33,15 +36,27 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
         eval_::eval(
             ctx,
             &sir::BasicBlock::new(
-                1,
+                3,
                 vec![
-                    // TODO: do not reduce 1 + 1
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 0,
-                        value: sir::Literal::Integer(2),
+                        value: sir::Literal::Integer(1),
+                    }),
+                    sir::Inst::new(sir::InstKind::Literal {
+                        lhs: 1,
+                        value: sir::Literal::Integer(1),
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
-                    sir::Inst::new(sir::InstKind::CallBuiltin(sir::BuiltinKind::Puti)),
+                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 1 }),
+                    sir::Inst::new(sir::InstKind::CallBuiltin {
+                        lhs: Some(2),
+                        builtin: sir::BuiltinKind::Add,
+                    }),
+                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 2 }),
+                    sir::Inst::new(sir::InstKind::CallBuiltin {
+                        lhs: None,
+                        builtin: sir::BuiltinKind::Puti,
+                    }),
                 ],
             ),
         );

@@ -32,9 +32,12 @@ pub fn typecheck(cctx: &CCtx, bb: &BasicBlock) -> Result<(), TypeError> {
                     .clone();
                 state.args.push(value_type);
             }
-            InstKind::CallBuiltin(f) => {
+            InstKind::CallBuiltin { lhs, builtin: f } => {
                 let args = std::mem::replace(&mut state.args, vec![]);
-                typecheck_builtin(cctx, *f, args)?;
+                let return_type = typecheck_builtin(cctx, *f, args)?;
+                if let Some(lhs) = lhs {
+                    state.vars[*lhs] = Some(return_type);
+                }
             }
         }
     }
@@ -46,6 +49,20 @@ pub fn typecheck(cctx: &CCtx, bb: &BasicBlock) -> Result<(), TypeError> {
 
 fn typecheck_builtin(_cctx: &CCtx, f: BuiltinKind, args: Vec<Type>) -> Result<Type, TypeError> {
     match f {
+        BuiltinKind::Add => {
+            if args.len() != 2 {
+                return Err(TypeError);
+            }
+            if let Type::Integer = &args[0] {
+            } else {
+                return Err(TypeError);
+            }
+            if let Type::Integer = &args[1] {
+            } else {
+                return Err(TypeError);
+            }
+            Ok(Type::Integer)
+        }
         BuiltinKind::Puts => {
             if args.len() != 1 {
                 return Err(TypeError);

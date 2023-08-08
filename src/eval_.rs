@@ -34,4 +34,24 @@ mod tests {
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
     }
+
+    #[test]
+    fn test_add() {
+        let ctx = MockRtCtx::new();
+        eval(
+            &ctx,
+            &BasicBlock::describe(|(tmp1, tmp2, x)| {
+                vec![
+                    insts::integer_literal(tmp1, 1),
+                    insts::integer_literal(tmp2, 1),
+                    insts::push_arg(tmp1),
+                    insts::push_arg(tmp2),
+                    insts::add(x),
+                    insts::push_arg(x),
+                    insts::puti(),
+                ]
+            }),
+        );
+        assert_eq!(ctx.stdout.lock().unwrap().as_str(), "2\n");
+    }
 }

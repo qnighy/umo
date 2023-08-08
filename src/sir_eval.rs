@@ -27,9 +27,12 @@ pub fn eval1(ctx: &dyn RtCtx, bb: &BasicBlock) {
                 let value = state.vars[*value_ref].take().unwrap();
                 state.args.push(value);
             }
-            InstKind::CallBuiltin(f) => {
+            InstKind::CallBuiltin { lhs, builtin: f } => {
                 let args = mem::replace(&mut state.args, vec![]);
-                eval_builtin(ctx, *f, args);
+                let return_value = eval_builtin(ctx, *f, args);
+                if let Some(lhs) = lhs {
+                    state.vars[*lhs] = Some(return_value);
+                }
             }
         }
     }
@@ -37,6 +40,16 @@ pub fn eval1(ctx: &dyn RtCtx, bb: &BasicBlock) {
 
 fn eval_builtin(ctx: &dyn RtCtx, f: BuiltinKind, args: Vec<Value>) -> Value {
     match f {
+        BuiltinKind::Add => {
+            assert_eq!(args.len(), 2);
+            let Value::Integer(i) = &args[0]  else {
+                panic!("Expected integer");
+            };
+            let Value::Integer(j) = &args[1] else {
+                panic!("Expected integer");
+            };
+            Value::Integer(i + j)
+        }
         BuiltinKind::Puts => {
             assert_eq!(args.len(), 1);
             if let Value::String(s) = &args[0] {
