@@ -1,5 +1,5 @@
 use crate::cctx::CCtx;
-use crate::sir::{BasicBlock, BuiltinKind, InstKind, Literal};
+use crate::sir::{BasicBlock, BuiltinKind, Function, InstKind, Literal};
 
 #[derive(Debug)]
 pub struct TypeError;
@@ -10,9 +10,15 @@ struct State {
     args: Vec<Type>,
 }
 
-pub fn typecheck(cctx: &CCtx, bb: &BasicBlock) -> Result<(), TypeError> {
+pub fn typecheck(cctx: &CCtx, function: &Function) -> Result<(), TypeError> {
+    for bb in &function.body {
+        typecheck_bb(cctx, function, bb)?;
+    }
+    Ok(())
+}
+fn typecheck_bb(cctx: &CCtx, function: &Function, bb: &BasicBlock) -> Result<(), TypeError> {
     let mut state = State {
-        vars: vec![None; bb.num_vars],
+        vars: vec![None; function.num_vars],
         args: vec![],
     };
     for inst in &bb.insts {
@@ -104,18 +110,18 @@ impl Type {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sir::testing::{insts, BasicBlockTestingExt};
-    use crate::sir::BasicBlock;
+    use crate::sir::testing::{insts, FunctionTestingExt};
+    use crate::sir::{BasicBlock, Function};
 
     #[test]
     fn test_typecheck_success() {
         let cctx = CCtx::new();
-        let bb = BasicBlock::describe(|(x,)| {
-            vec![
+        let bb = Function::describe(|(x,)| {
+            vec![BasicBlock::new(vec![
                 insts::integer_literal(x, 42),
                 insts::push_arg(x),
                 insts::puti(),
-            ]
+            ])]
         });
         assert!(typecheck(&cctx, &bb).is_ok());
     }
@@ -123,20 +129,20 @@ mod tests {
     #[test]
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
-        let bb = BasicBlock::describe(|()| vec![insts::puti()]);
+        let bb = Function::describe(|()| vec![BasicBlock::new(vec![insts::puti()])]);
         assert!(typecheck(&cctx, &bb).is_err());
     }
 
     #[test]
     fn test_typecheck_failure_too_many_arg() {
         let cctx = CCtx::new();
-        let bb = BasicBlock::describe(|(x,)| {
-            vec![
+        let bb = Function::describe(|(x,)| {
+            vec![BasicBlock::new(vec![
                 insts::integer_literal(x, 42),
                 insts::push_arg(x),
                 insts::push_arg(x),
                 insts::puti(),
-            ]
+            ])]
         });
         assert!(typecheck(&cctx, &bb).is_err());
     }
@@ -144,12 +150,12 @@ mod tests {
     #[test]
     fn test_typecheck_failure_arg_type_mismatch() {
         let cctx = CCtx::new();
-        let bb = BasicBlock::describe(|(x,)| {
-            vec![
+        let bb = Function::describe(|(x,)| {
+            vec![BasicBlock::new(vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
                 insts::puti(),
-            ]
+            ])]
         });
         assert!(typecheck(&cctx, &bb).is_err());
     }
@@ -157,11 +163,11 @@ mod tests {
     #[test]
     fn test_typecheck_failure_runaway_arg() {
         let cctx = CCtx::new();
-        let bb = BasicBlock::describe(|(x,)| {
-            vec![
+        let bb = Function::describe(|(x,)| {
+            vec![BasicBlock::new(vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
-            ]
+            ])]
         });
         assert!(typecheck(&cctx, &bb).is_err());
     }

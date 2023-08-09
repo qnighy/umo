@@ -2,31 +2,47 @@ use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use crate::cctx::{CCtx, Id};
-use crate::sir::{BasicBlock, Inst, InstKind};
+use crate::sir::{BasicBlock, Function, Inst, InstKind};
 
-pub fn compile(cctx: &CCtx, bb: &BasicBlock) -> BasicBlock {
-    let mut bb = bb.clone();
-    assign_id(cctx, &mut bb);
-    let live_in = liveness(cctx, &bb);
-    insert_copy(cctx, &mut bb, &live_in);
-    unassign_id(&mut bb);
-    bb
+pub fn compile(cctx: &CCtx, function: &Function) -> Function {
+    let mut function = function.clone();
+    assign_id(cctx, &mut function);
+    let live_in = liveness(cctx, &function);
+    insert_copy(cctx, &mut function, &live_in);
+    unassign_id(&mut function);
+    function
 }
 
-fn assign_id(cctx: &CCtx, bb: &mut BasicBlock) {
+fn assign_id(cctx: &CCtx, function: &mut Function) {
+    for bb in &mut function.body {
+        assign_id_bb(cctx, bb);
+    }
+}
+fn assign_id_bb(cctx: &CCtx, bb: &mut BasicBlock) {
     for inst in &mut bb.insts {
         inst.id = cctx.id_gen.fresh();
     }
 }
 
-fn unassign_id(bb: &mut BasicBlock) {
+fn unassign_id(function: &mut Function) {
+    for bb in &mut function.body {
+        unassign_id_bb(bb);
+    }
+}
+fn unassign_id_bb(bb: &mut BasicBlock) {
     for inst in &mut bb.insts {
         inst.id = Id::default();
     }
 }
 
-fn liveness(_cctx: &CCtx, bb: &BasicBlock) -> HashMap<Id, HashSet<usize>> {
+fn liveness(cctx: &CCtx, function: &Function) -> HashMap<Id, HashSet<usize>> {
     let mut live_in = HashMap::new();
+    for bb in &function.body {
+        liveness_bb(cctx, bb, &mut live_in);
+    }
+    live_in
+}
+fn liveness_bb(_cctx: &CCtx, bb: &BasicBlock, live_in: &mut HashMap<Id, HashSet<usize>>) {
     let mut i = bb.insts.len();
     let mut alive = HashSet::new();
     while i > 0 {
@@ -50,10 +66,19 @@ fn liveness(_cctx: &CCtx, bb: &BasicBlock) -> HashMap<Id, HashSet<usize>> {
         }
         live_in.insert(bb.insts[i].id, alive.clone());
     }
-    live_in
 }
 
-fn insert_copy(_cctx: &CCtx, bb: &mut BasicBlock, live_in: &HashMap<Id, HashSet<usize>>) {
+fn insert_copy(cctx: &CCtx, function: &mut Function, live_in: &HashMap<Id, HashSet<usize>>) {
+    for bb in &mut function.body {
+        insert_copy_bb(cctx, &mut function.num_vars, bb, live_in);
+    }
+}
+fn insert_copy_bb(
+    _cctx: &CCtx,
+    num_vars: &mut usize,
+    bb: &mut BasicBlock,
+    live_in: &HashMap<Id, HashSet<usize>>,
+) {
     let mut copied_var_for = HashMap::new();
     for (i, inst) in bb.insts.iter().enumerate() {
         let rhs = moved_rhs_of(inst);
@@ -68,8 +93,8 @@ fn insert_copy(_cctx: &CCtx, bb: &mut BasicBlock, live_in: &HashMap<Id, HashSet<
                 false
             };
             if used_next {
-                copied_var_for.insert(inst.id, bb.num_vars);
-                bb.num_vars += 1;
+                copied_var_for.insert(inst.id, *num_vars);
+                *num_vars += 1;
             }
         }
     }
@@ -114,15 +139,15 @@ fn replace_moved_rhs(bb: &mut Inst, to: usize) {
 
 #[cfg(test)]
 mod tests {
-    use crate::sir::testing::{insts, BasicBlockTestingExt};
+    use crate::sir::testing::{insts, FunctionTestingExt};
 
     use super::*;
 
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let bb = BasicBlock::describe(|(x,)| {
-            vec![
+        let bb = Function::describe(|(x,)| {
+            vec![BasicBlock::new(vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
                 insts::puts(),
@@ -131,13 +156,13 @@ mod tests {
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
                 insts::puts(),
-            ]
+            ])]
         });
         let bb = compile(&cctx, &bb);
         assert_eq!(
             bb,
-            BasicBlock::describe(|(x, tmp1)| {
-                vec![
+            Function::describe(|(x, tmp1)| {
+                vec![BasicBlock::new(vec![
                     insts::string_literal(x, "Hello, world!"),
                     insts::copy(tmp1, x),
                     insts::push_arg(tmp1),
@@ -147,7 +172,7 @@ mod tests {
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
-                ]
+                ])]
             })
         );
     }

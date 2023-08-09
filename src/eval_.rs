@@ -1,11 +1,11 @@
 use crate::cctx::CCtx;
 use crate::rt_ctx::RtCtx;
-use crate::sir::BasicBlock;
+use crate::sir::Function;
 use crate::sir_compile::compile;
 use crate::sir_eval::eval1;
 use crate::sir_typecheck::typecheck;
 
-pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
+pub fn eval(ctx: &dyn RtCtx, bb: &Function) {
     let cctx = CCtx::new();
     typecheck(&cctx, bb).unwrap();
     let bb = compile(&cctx, bb);
@@ -16,7 +16,8 @@ pub fn eval(ctx: &dyn RtCtx, bb: &BasicBlock) {
 mod tests {
     use super::*;
 
-    use crate::sir::testing::{insts, BasicBlockTestingExt};
+    use crate::sir::testing::{insts, FunctionTestingExt};
+    use crate::sir::BasicBlock;
     use crate::testing::MockRtCtx;
 
     #[test]
@@ -24,12 +25,12 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &BasicBlock::describe(|(x,)| {
-                vec![
+            &Function::describe(|(x,)| {
+                vec![BasicBlock::new(vec![
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
-                ]
+                ])]
             }),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
@@ -40,8 +41,8 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &BasicBlock::describe(|(tmp1, tmp2, x)| {
-                vec![
+            &Function::describe(|(tmp1, tmp2, x)| {
+                vec![BasicBlock::new(vec![
                     insts::integer_literal(tmp1, 1),
                     insts::integer_literal(tmp2, 1),
                     insts::push_arg(tmp1),
@@ -49,7 +50,7 @@ mod tests {
                     insts::add(x),
                     insts::push_arg(x),
                     insts::puti(),
-                ]
+                ])]
             }),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "2\n");

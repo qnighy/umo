@@ -17,9 +17,9 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
     if source == "use lang::\"0.0.1\";\nputs(\"Hello, world!\");\n" {
         eval_::eval(
             ctx,
-            &sir::BasicBlock::new(
+            &sir::Function::new(
                 1,
-                vec![
+                vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 0,
                         value: sir::Literal::String(Arc::new("Hello, world!".to_string())),
@@ -29,15 +29,15 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         lhs: None,
                         builtin: sir::BuiltinKind::Puts,
                     }),
-                ],
+                ])],
             ),
         );
     } else if source == "use lang::\"0.0.1\";\nputi(1 + 1);\n" {
         eval_::eval(
             ctx,
-            &sir::BasicBlock::new(
+            &sir::Function::new(
                 3,
-                vec![
+                vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 0,
                         value: sir::Literal::Integer(1),
@@ -57,7 +57,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         lhs: None,
                         builtin: sir::BuiltinKind::Puti,
                     }),
-                ],
+                ])],
             ),
         );
     } else {

@@ -4,17 +4,27 @@ use std::sync::Arc;
 
 use crate::cctx::Id;
 
-// Define BasicBlock
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Function {
+    pub num_vars: usize,
+    // pub num_args: usize,
+    pub body: Vec<BasicBlock>,
+}
+
+impl Function {
+    pub fn new(num_vars: usize, body: Vec<BasicBlock>) -> Self {
+        Self { num_vars, body }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BasicBlock {
-    // To be hoisted to FunDef
-    pub num_vars: usize,
     pub insts: Vec<Inst>,
 }
 
 impl BasicBlock {
-    pub fn new(num_vars: usize, insts: Vec<Inst>) -> Self {
-        Self { num_vars, insts }
+    pub fn new(insts: Vec<Inst>) -> Self {
+        Self { insts }
     }
 }
 
@@ -68,24 +78,24 @@ pub enum BuiltinKind {
 
 #[cfg(test)]
 pub mod testing {
-    use crate::sir::{BasicBlock, Inst};
+    use crate::sir::{BasicBlock, Function};
     use crate::testing::SeqGen;
 
-    pub trait BasicBlockTestingExt {
+    pub trait FunctionTestingExt {
         fn describe<T, F>(f: F) -> Self
         where
             T: SeqGen,
-            F: FnOnce(T) -> Vec<Inst>;
+            F: FnOnce(T) -> Vec<BasicBlock>;
     }
 
-    impl BasicBlockTestingExt for BasicBlock {
+    impl FunctionTestingExt for Function {
         fn describe<T, F>(f: F) -> Self
         where
             T: SeqGen,
-            F: FnOnce(T) -> Vec<Inst>,
+            F: FnOnce(T) -> Vec<BasicBlock>,
         {
-            let insts = f(T::seq());
-            Self::new(T::size(), insts)
+            let body = f(T::seq());
+            Self::new(T::size(), body)
         }
     }
 
