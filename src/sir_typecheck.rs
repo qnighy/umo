@@ -4,90 +4,165 @@ use crate::sir::{BasicBlock, BuiltinKind, Function, InstKind, Literal};
 #[derive(Debug)]
 pub struct TypeError;
 
+#[derive(Debug)]
+struct TyCtx {
+    ty_vars: Vec<Option<Type>>,
+}
+
+impl TyCtx {
+    fn fresh(&mut self) -> Type {
+        let ty = Type::Var {
+            var_id: self.ty_vars.len(),
+        };
+        self.ty_vars.push(None);
+        ty
+    }
+    fn unify(&mut self, ty1: &Type, ty2: &Type) -> Result<(), TypeError> {
+        if let Type::Var { var_id: id } = ty1 {
+            if let Some(ty1a) = &self.ty_vars[*id] {
+                let ty1a = ty1a.clone();
+                return self.unify(&ty1a, ty2);
+            }
+        }
+        if let Type::Var { var_id: id } = ty2 {
+            if let Some(ty2a) = &self.ty_vars[*id] {
+                let ty2a = ty2a.clone();
+                return self.unify(ty1, &ty2a);
+            }
+        }
+        match (ty1, ty2) {
+            (Type::Var { var_id: id1 }, Type::Var { var_id: id2 }) if id1 == id2 => Ok(()),
+            (Type::Var { var_id: id1 }, ty2) => {
+                if self.has_ty_var(ty2, *id1) {
+                    return Err(TypeError);
+                }
+                self.ty_vars[*id1] = Some(ty2.clone());
+                Ok(())
+            }
+            (ty1, Type::Var { var_id: id2 }) => {
+                if self.has_ty_var(ty1, *id2) {
+                    return Err(TypeError);
+                }
+                self.ty_vars[*id2] = Some(ty1.clone());
+                Ok(())
+            }
+            (Type::String, Type::String) => Ok(()),
+            (Type::Integer, Type::Integer) => Ok(()),
+            _ => Err(TypeError),
+        }
+    }
+    fn has_ty_var(&self, ty: &Type, needle_id: usize) -> bool {
+        match ty {
+            Type::Var { var_id: id } => {
+                if *id == needle_id {
+                    true
+                } else if let Some(ty) = &self.ty_vars[*id] {
+                    self.has_ty_var(ty, needle_id)
+                } else {
+                    false
+                }
+            }
+            Type::String => false,
+            Type::Integer => false,
+        }
+    }
+    fn has_any_ty_var(&self, ty: &Type) -> bool {
+        match ty {
+            Type::Var { var_id } => {
+                if let Some(ty) = &self.ty_vars[*var_id] {
+                    self.has_any_ty_var(ty)
+                } else {
+                    true
+                }
+            }
+            Type::String => false,
+            Type::Integer => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct State {
-    vars: Vec<Option<Type>>,
-    args: Vec<Type>,
+    vars: Vec<Type>,
 }
 
 pub fn typecheck(cctx: &CCtx, function: &Function) -> Result<(), TypeError> {
+    let mut ty_ctx = TyCtx { ty_vars: vec![] };
+    let mut state = State {
+        vars: (0..function.num_vars).map(|_| ty_ctx.fresh()).collect(),
+    };
     for bb in &function.body {
-        typecheck_bb(cctx, function, bb)?;
+        typecheck_bb(cctx, &mut ty_ctx, &mut state, bb)?;
     }
+    for ty in &state.vars {
+        if ty_ctx.has_any_ty_var(ty) {
+            return Err(TypeError);
+        }
+    }
+    // TODO: also check liveness
     Ok(())
 }
-fn typecheck_bb(cctx: &CCtx, function: &Function, bb: &BasicBlock) -> Result<(), TypeError> {
-    let mut state = State {
-        vars: vec![None; function.num_vars],
-        args: vec![],
-    };
+fn typecheck_bb(
+    cctx: &CCtx,
+    ty_ctx: &mut TyCtx,
+    state: &mut State,
+    bb: &BasicBlock,
+) -> Result<(), TypeError> {
+    let mut args = vec![];
     for inst in &bb.insts {
         match &inst.kind {
             InstKind::Copy { lhs, rhs } => {
-                let rhs_type = state.vars[*rhs].as_ref().ok_or_else(|| TypeError)?.clone();
-                state.vars[*lhs] = Some(rhs_type);
+                ty_ctx.unify(&state.vars[*lhs], &state.vars[*rhs])?;
             }
             InstKind::Literal { lhs, value } => {
-                let value_type = Type::of_literal(value);
-                state.vars[*lhs] = Some(value_type);
+                ty_ctx.unify(&state.vars[*lhs], &Type::of_literal(value))?;
             }
             InstKind::PushArg { value_ref } => {
-                let value_type = state.vars[*value_ref]
-                    .as_ref()
-                    .ok_or_else(|| TypeError)?
-                    .clone();
-                state.args.push(value_type);
+                args.push(state.vars[*value_ref].clone());
             }
             InstKind::CallBuiltin { lhs, builtin: f } => {
-                let args = std::mem::replace(&mut state.args, vec![]);
-                let return_type = typecheck_builtin(cctx, *f, args)?;
+                let args = std::mem::replace(&mut args, vec![]);
+                let return_type = typecheck_builtin(cctx, ty_ctx, *f, args)?;
                 if let Some(lhs) = lhs {
-                    state.vars[*lhs] = Some(return_type);
+                    ty_ctx.unify(&state.vars[*lhs], &return_type)?;
                 }
             }
         }
     }
-    if !state.args.is_empty() {
+    if !args.is_empty() {
         return Err(TypeError);
     }
     Ok(())
 }
 
-fn typecheck_builtin(_cctx: &CCtx, f: BuiltinKind, args: Vec<Type>) -> Result<Type, TypeError> {
+fn typecheck_builtin(
+    _cctx: &CCtx,
+    ty_ctx: &mut TyCtx,
+    f: BuiltinKind,
+    args: Vec<Type>,
+) -> Result<Type, TypeError> {
     match f {
         BuiltinKind::Add => {
             if args.len() != 2 {
                 return Err(TypeError);
             }
-            if let Type::Integer = &args[0] {
-            } else {
-                return Err(TypeError);
-            }
-            if let Type::Integer = &args[1] {
-            } else {
-                return Err(TypeError);
-            }
+            ty_ctx.unify(&args[0], &Type::Integer)?;
+            ty_ctx.unify(&args[1], &Type::Integer)?;
             Ok(Type::Integer)
         }
         BuiltinKind::Puts => {
             if args.len() != 1 {
                 return Err(TypeError);
             }
-            if let Type::String = &args[0] {
-                Ok(Type::Integer)
-            } else {
-                Err(TypeError)
-            }
+            ty_ctx.unify(&args[0], &Type::String)?;
+            Ok(Type::Integer)
         }
         BuiltinKind::Puti => {
             if args.len() != 1 {
                 return Err(TypeError);
             }
-            if let Type::Integer = &args[0] {
-                Ok(Type::Integer)
-            } else {
-                Err(TypeError)
-            }
+            ty_ctx.unify(&args[0], &Type::Integer)?;
+            Ok(Type::Integer)
         }
     }
 }
@@ -96,6 +171,7 @@ fn typecheck_builtin(_cctx: &CCtx, f: BuiltinKind, args: Vec<Type>) -> Result<Ty
 enum Type {
     String,
     Integer,
+    Var { var_id: usize },
 }
 
 impl Type {
