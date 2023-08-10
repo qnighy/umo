@@ -48,6 +48,7 @@ impl TyCtx {
             }
             (Type::String, Type::String) => Ok(()),
             (Type::Integer, Type::Integer) => Ok(()),
+            (Type::Bool, Type::Bool) => Ok(()),
             _ => Err(TypeError),
         }
     }
@@ -64,6 +65,7 @@ impl TyCtx {
             }
             Type::String => false,
             Type::Integer => false,
+            Type::Bool => false,
         }
     }
     fn has_any_ty_var(&self, ty: &Type) -> bool {
@@ -77,6 +79,7 @@ impl TyCtx {
             }
             Type::String => false,
             Type::Integer => false,
+            Type::Bool => false,
         }
     }
 }
@@ -120,6 +123,20 @@ fn typecheck_bb(
                 if *target >= function.body.len() {
                     return Err(TypeError);
                 }
+                end_block = true;
+            }
+            InstKind::Branch {
+                cond,
+                branch_then,
+                branch_else,
+            } => {
+                if *branch_then >= function.body.len() {
+                    return Err(TypeError);
+                }
+                if *branch_else >= function.body.len() {
+                    return Err(TypeError);
+                }
+                ty_ctx.unify(&state.vars[*cond], &Type::Bool)?;
                 end_block = true;
             }
             InstKind::Copy { lhs, rhs } => {
@@ -182,6 +199,7 @@ fn typecheck_builtin(
 enum Type {
     String,
     Integer,
+    Bool,
     Var { var_id: usize },
 }
 
@@ -189,6 +207,7 @@ impl Type {
     fn of_literal(literal: &Literal) -> Self {
         match literal {
             Literal::Integer(_) => Self::Integer,
+            Literal::Bool(_) => Self::Bool,
             Literal::String(_) => Self::String,
         }
     }

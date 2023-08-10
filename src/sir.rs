@@ -49,6 +49,12 @@ pub enum InstKind {
     Jump {
         target: usize,
     },
+    #[allow(unused)] // TODO: remove it later
+    Branch {
+        cond: usize,
+        branch_then: usize,
+        branch_else: usize,
+    },
     Copy {
         lhs: usize,
         rhs: usize,
@@ -70,6 +76,8 @@ pub enum InstKind {
 pub enum Literal {
     // TODO: use BigInt
     Integer(i32),
+    #[allow(unused)] // TODO: remove it later
+    Bool(bool),
     String(Arc<String>),
 }
 
@@ -109,6 +117,13 @@ pub mod testing {
         pub fn jump(target: usize) -> Inst {
             Inst::new(InstKind::Jump { target })
         }
+        pub fn branch(cond: usize, branch_then: usize, branch_else: usize) -> Inst {
+            Inst::new(InstKind::Branch {
+                cond,
+                branch_then,
+                branch_else,
+            })
+        }
         pub fn copy(lhs: usize, rhs: usize) -> Inst {
             Inst::new(InstKind::Copy { lhs, rhs })
         }
@@ -116,6 +131,12 @@ pub mod testing {
             Inst::new(InstKind::Literal {
                 lhs,
                 value: Literal::Integer(value),
+            })
+        }
+        pub fn bool_literal(lhs: usize, value: bool) -> Inst {
+            Inst::new(InstKind::Literal {
+                lhs,
+                value: Literal::Bool(value),
             })
         }
         pub fn string_literal(lhs: usize, value: &str) -> Inst {

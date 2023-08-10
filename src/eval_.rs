@@ -73,4 +73,52 @@ mod tests {
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "2\n");
     }
+
+    #[test]
+    fn test_branch_true() {
+        let ctx = MockRtCtx::new();
+        eval(
+            &ctx,
+            &Function::describe(|(x, s)| {
+                vec![
+                    BasicBlock::new(vec![insts::bool_literal(x, true), insts::branch(x, 1, 2)]),
+                    BasicBlock::new(vec![
+                        insts::string_literal(s, "x is true"),
+                        insts::push_arg(s),
+                        insts::puts(),
+                    ]),
+                    BasicBlock::new(vec![
+                        insts::string_literal(s, "x is false"),
+                        insts::push_arg(s),
+                        insts::puts(),
+                    ]),
+                ]
+            }),
+        );
+        assert_eq!(ctx.stdout.lock().unwrap().as_str(), "x is true\n");
+    }
+
+    #[test]
+    fn test_branch_false() {
+        let ctx = MockRtCtx::new();
+        eval(
+            &ctx,
+            &Function::describe(|(x, s)| {
+                vec![
+                    BasicBlock::new(vec![insts::bool_literal(x, false), insts::branch(x, 1, 2)]),
+                    BasicBlock::new(vec![
+                        insts::string_literal(s, "x is true"),
+                        insts::push_arg(s),
+                        insts::puts(),
+                    ]),
+                    BasicBlock::new(vec![
+                        insts::string_literal(s, "x is false"),
+                        insts::push_arg(s),
+                        insts::puts(),
+                    ]),
+                ]
+            }),
+        );
+        assert_eq!(ctx.stdout.lock().unwrap().as_str(), "x is false\n");
+    }
 }

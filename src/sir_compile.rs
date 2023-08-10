@@ -61,10 +61,16 @@ fn liveness_bb(
         i -= 1;
         match &bb.insts[i].kind {
             InstKind::Jump { target } => {
-                alive = live_in
-                    .get(&function.body[*target].insts[0].id)
-                    .cloned()
-                    .unwrap_or_else(|| BitSet::default());
+                alive = get_block_liveness(function, live_in, target);
+            }
+            InstKind::Branch {
+                cond,
+                branch_then,
+                branch_else,
+            } => {
+                alive = get_block_liveness(function, live_in, branch_then);
+                alive.union_with(&get_block_liveness(function, live_in, branch_else));
+                alive.insert(*cond);
             }
             InstKind::Copy { lhs, rhs } => {
                 alive.remove(*lhs);
@@ -90,6 +96,17 @@ fn liveness_bb(
             };
         live_in.insert(bb.insts[i].id, alive.clone());
     }
+}
+
+fn get_block_liveness(
+    function: &Function,
+    live_in: &HashMap<Id, BitSet<usize>>,
+    target: &usize,
+) -> BitSet<usize> {
+    live_in
+        .get(&function.body[*target].insts[0].id)
+        .cloned()
+        .unwrap_or_else(|| BitSet::default())
 }
 
 fn insert_copy(cctx: &CCtx, function: &mut Function, live_in: &HashMap<Id, BitSet<usize>>) {
@@ -138,6 +155,7 @@ fn insert_copy_bb(
 fn moved_rhs_of(bb: &Inst) -> Option<usize> {
     match &bb.kind {
         InstKind::Jump { .. } => None,
+        InstKind::Branch { cond, .. } => Some(*cond),
         InstKind::Copy { .. } => None,
         InstKind::Literal { .. } => None,
         InstKind::PushArg { value_ref } => Some(*value_ref),
@@ -149,6 +167,9 @@ fn replace_moved_rhs(bb: &mut Inst, to: usize) {
     match &mut bb.kind {
         InstKind::Jump { .. } => {
             unreachable!();
+        }
+        InstKind::Branch { cond, .. } => {
+            *cond = to;
         }
         InstKind::Copy { .. } => {
             unreachable!();

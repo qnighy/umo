@@ -31,6 +31,19 @@ fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> Option<usize
             InstKind::Jump { target } => {
                 return Some(*target);
             }
+            InstKind::Branch {
+                cond,
+                branch_then,
+                branch_else,
+            } => {
+                let cond = state.vars[*cond].as_ref().unwrap();
+                let cond = if let Value::Integer(i) = cond {
+                    *i != 0
+                } else {
+                    panic!("Expected integer");
+                };
+                return Some(if cond { *branch_then } else { *branch_else });
+            }
             InstKind::Copy { lhs, rhs } => {
                 state.vars[*lhs] = Some(state.vars[*rhs].as_ref().unwrap().clone());
             }
@@ -97,6 +110,7 @@ impl From<Literal> for Value {
         match l {
             Literal::String(s) => Value::String(s),
             Literal::Integer(i) => Value::Integer(i),
+            Literal::Bool(b) => Value::Integer(b as i32),
         }
     }
 }
