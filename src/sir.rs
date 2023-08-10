@@ -84,6 +84,8 @@ pub enum Literal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BuiltinKind {
     Add,
+    #[allow(unused)] // TODO: remove it later
+    Lt,
     Puts,
     Puti,
 }
@@ -152,6 +154,12 @@ pub mod testing {
             Inst::new(InstKind::CallBuiltin {
                 lhs: Some(lhs),
                 builtin: BuiltinKind::Add,
+            })
+        }
+        pub fn lt(lhs: usize) -> Inst {
+            Inst::new(InstKind::CallBuiltin {
+                lhs: Some(lhs),
+                builtin: BuiltinKind::Lt,
             })
         }
         pub fn puts() -> Inst {

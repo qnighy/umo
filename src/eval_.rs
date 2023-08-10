@@ -121,4 +121,65 @@ mod tests {
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "x is false\n");
     }
+
+    #[test]
+    fn test_sum() {
+        // let mut sum = 0;
+        // let mut i = 0;
+        // while i < 10 {
+        //     sum += i;
+        //     i += 1;
+        // }
+        // puti(sum);
+
+        let ctx = MockRtCtx::new();
+        eval(
+            &ctx,
+            &Function::describe(|(sum, i, tmp1, tmp2, tmp3)| {
+                vec![
+                    // start:
+                    BasicBlock::new(vec![
+                        // let mut sum = 0;
+                        insts::integer_literal(sum, 0),
+                        // let mut i = 0;
+                        insts::integer_literal(i, 0),
+                        // goto cond;
+                        insts::jump(1),
+                    ]),
+                    // cond:
+                    BasicBlock::new(vec![
+                        // tmp1 = 10;
+                        insts::integer_literal(tmp1, 10),
+                        // tmp2 = i < tmp1;
+                        insts::push_arg(i),
+                        insts::push_arg(tmp1),
+                        insts::lt(tmp2),
+                        // if tmp2 { goto body; } else { goto end; };
+                        insts::branch(tmp2, 2, 3),
+                    ]),
+                    // body:
+                    BasicBlock::new(vec![
+                        // sum = sum + i;
+                        insts::push_arg(sum),
+                        insts::push_arg(i),
+                        insts::add(sum),
+                        // i = i + 1;
+                        insts::integer_literal(tmp3, 1),
+                        insts::push_arg(i),
+                        insts::push_arg(tmp3),
+                        insts::add(i),
+                        // goto cond;
+                        insts::jump(1),
+                    ]),
+                    // end:
+                    BasicBlock::new(vec![
+                        // puti(sum);
+                        insts::push_arg(sum),
+                        insts::puti(),
+                    ]),
+                ]
+            }),
+        );
+        assert_eq!(ctx.stdout.lock().unwrap().as_str(), "45\n");
+    }
 }

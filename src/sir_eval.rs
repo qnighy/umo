@@ -78,6 +78,16 @@ fn eval_builtin(ctx: &dyn RtCtx, f: BuiltinKind, args: Vec<Value>) -> Value {
             };
             Value::Integer(i + j)
         }
+        BuiltinKind::Lt => {
+            assert_eq!(args.len(), 2);
+            let Value::Integer(i) = &args[0]  else {
+                panic!("Expected integer");
+            };
+            let Value::Integer(j) = &args[1] else {
+                panic!("Expected integer");
+            };
+            Value::Integer((i < j) as i32)
+        }
         BuiltinKind::Puts => {
             assert_eq!(args.len(), 1);
             if let Value::String(s) = &args[0] {

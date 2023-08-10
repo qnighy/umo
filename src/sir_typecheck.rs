@@ -178,6 +178,14 @@ fn typecheck_builtin(
             ty_ctx.unify(&args[1], &Type::Integer)?;
             Ok(Type::Integer)
         }
+        BuiltinKind::Lt => {
+            if args.len() != 2 {
+                return Err(TypeError);
+            }
+            ty_ctx.unify(&args[0], &Type::Integer)?;
+            ty_ctx.unify(&args[1], &Type::Integer)?;
+            Ok(Type::Bool)
+        }
         BuiltinKind::Puts => {
             if args.len() != 1 {
                 return Err(TypeError);
