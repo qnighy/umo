@@ -15,11 +15,22 @@ pub fn eval1(ctx: &dyn RtCtx, function: &Function) {
         vars: vec![None; function.num_vars],
         args: vec![],
     };
-    eval1_bb(ctx, &mut state, &function.body[0]);
+    let mut current_bb_id = 0;
+    loop {
+        let bb = &function.body[current_bb_id];
+        if let Some(next_bb_id) = eval1_bb(ctx, &mut state, bb) {
+            current_bb_id = next_bb_id;
+        } else {
+            break;
+        }
+    }
 }
-fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) {
+fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> Option<usize> {
     for inst in &bb.insts {
         match &inst.kind {
+            InstKind::Jump { target } => {
+                return Some(*target);
+            }
             InstKind::Copy { lhs, rhs } => {
                 state.vars[*lhs] = Some(state.vars[*rhs].as_ref().unwrap().clone());
             }
@@ -39,6 +50,7 @@ fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) {
             }
         }
     }
+    None
 }
 
 fn eval_builtin(ctx: &dyn RtCtx, f: BuiltinKind, args: Vec<Value>) -> Value {

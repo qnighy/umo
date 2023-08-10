@@ -37,6 +37,24 @@ mod tests {
     }
 
     #[test]
+    fn test_puts_with_artificial_jump() {
+        let ctx = MockRtCtx::new();
+        eval(
+            &ctx,
+            &Function::describe(|(x,)| {
+                vec![
+                    BasicBlock::new(vec![
+                        insts::string_literal(x, "Hello, world!"),
+                        insts::jump(1),
+                    ]),
+                    BasicBlock::new(vec![insts::push_arg(x), insts::puts()]),
+                ]
+            }),
+        );
+        assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
+    }
+
+    #[test]
     fn test_add() {
         let ctx = MockRtCtx::new();
         eval(

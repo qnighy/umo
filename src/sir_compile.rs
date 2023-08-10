@@ -1,5 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::mem;
+
+use bit_set::BitSet;
 
 use crate::cctx::{CCtx, Id};
 use crate::sir::{BasicBlock, Function, Inst, InstKind};
@@ -35,40 +37,62 @@ fn unassign_id_bb(bb: &mut BasicBlock) {
     }
 }
 
-fn liveness(cctx: &CCtx, function: &Function) -> HashMap<Id, HashSet<usize>> {
+fn liveness(cctx: &CCtx, function: &Function) -> HashMap<Id, BitSet<usize>> {
     let mut live_in = HashMap::new();
-    for bb in &function.body {
-        liveness_bb(cctx, bb, &mut live_in);
+    let mut updated = true;
+    while updated {
+        updated = false;
+        for bb in function.body.iter().rev() {
+            liveness_bb(cctx, function, bb, &mut live_in, &mut updated);
+        }
     }
     live_in
 }
-fn liveness_bb(_cctx: &CCtx, bb: &BasicBlock, live_in: &mut HashMap<Id, HashSet<usize>>) {
+fn liveness_bb(
+    _cctx: &CCtx,
+    function: &Function,
+    bb: &BasicBlock,
+    live_in: &mut HashMap<Id, BitSet<usize>>,
+    updated: &mut bool,
+) {
     let mut i = bb.insts.len();
-    let mut alive = HashSet::new();
+    let mut alive = BitSet::<usize>::default();
     while i > 0 {
         i -= 1;
         match &bb.insts[i].kind {
+            InstKind::Jump { target } => {
+                alive = live_in
+                    .get(&function.body[*target].insts[0].id)
+                    .cloned()
+                    .unwrap_or_else(|| BitSet::default());
+            }
             InstKind::Copy { lhs, rhs } => {
-                alive.remove(lhs);
+                alive.remove(*lhs);
                 alive.insert(*rhs);
             }
             InstKind::Literal { lhs, .. } => {
-                alive.remove(lhs);
+                alive.remove(*lhs);
             }
             InstKind::PushArg { value_ref } => {
                 alive.insert(*value_ref);
             }
             InstKind::CallBuiltin { lhs, .. } => {
                 if let Some(lhs) = lhs {
-                    alive.remove(lhs);
+                    alive.remove(*lhs);
                 }
             }
         }
+        *updated = *updated
+            || if let Some(old_alive) = live_in.get(&bb.insts[i].id) {
+                *old_alive != alive
+            } else {
+                true
+            };
         live_in.insert(bb.insts[i].id, alive.clone());
     }
 }
 
-fn insert_copy(cctx: &CCtx, function: &mut Function, live_in: &HashMap<Id, HashSet<usize>>) {
+fn insert_copy(cctx: &CCtx, function: &mut Function, live_in: &HashMap<Id, BitSet<usize>>) {
     for bb in &mut function.body {
         insert_copy_bb(cctx, &mut function.num_vars, bb, live_in);
     }
@@ -77,7 +101,7 @@ fn insert_copy_bb(
     _cctx: &CCtx,
     num_vars: &mut usize,
     bb: &mut BasicBlock,
-    live_in: &HashMap<Id, HashSet<usize>>,
+    live_in: &HashMap<Id, BitSet<usize>>,
 ) {
     let mut copied_var_for = HashMap::new();
     for (i, inst) in bb.insts.iter().enumerate() {
@@ -85,7 +109,7 @@ fn insert_copy_bb(
         if let Some(rhs) = rhs {
             let used_next = if i + 1 < bb.insts.len() {
                 if let Some(live_in) = live_in.get(&bb.insts[i + 1].id) {
-                    live_in.contains(&rhs)
+                    live_in.contains(rhs)
                 } else {
                     false
                 }
@@ -113,6 +137,7 @@ fn insert_copy_bb(
 
 fn moved_rhs_of(bb: &Inst) -> Option<usize> {
     match &bb.kind {
+        InstKind::Jump { .. } => None,
         InstKind::Copy { .. } => None,
         InstKind::Literal { .. } => None,
         InstKind::PushArg { value_ref } => Some(*value_ref),
@@ -122,6 +147,9 @@ fn moved_rhs_of(bb: &Inst) -> Option<usize> {
 
 fn replace_moved_rhs(bb: &mut Inst, to: usize) {
     match &mut bb.kind {
+        InstKind::Jump { .. } => {
+            unreachable!();
+        }
         InstKind::Copy { .. } => {
             unreachable!();
         }

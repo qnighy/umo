@@ -92,7 +92,7 @@ pub fn typecheck(cctx: &CCtx, function: &Function) -> Result<(), TypeError> {
         vars: (0..function.num_vars).map(|_| ty_ctx.fresh()).collect(),
     };
     for bb in &function.body {
-        typecheck_bb(cctx, &mut ty_ctx, &mut state, bb)?;
+        typecheck_bb(cctx, &mut ty_ctx, &mut state, function, bb)?;
     }
     for ty in &state.vars {
         if ty_ctx.has_any_ty_var(ty) {
@@ -106,11 +106,22 @@ fn typecheck_bb(
     cctx: &CCtx,
     ty_ctx: &mut TyCtx,
     state: &mut State,
+    function: &Function,
     bb: &BasicBlock,
 ) -> Result<(), TypeError> {
     let mut args = vec![];
+    let mut end_block = false;
     for inst in &bb.insts {
+        if end_block {
+            return Err(TypeError);
+        }
         match &inst.kind {
+            InstKind::Jump { target } => {
+                if *target >= function.body.len() {
+                    return Err(TypeError);
+                }
+                end_block = true;
+            }
             InstKind::Copy { lhs, rhs } => {
                 ty_ctx.unify(&state.vars[*lhs], &state.vars[*rhs])?;
             }

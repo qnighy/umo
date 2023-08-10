@@ -45,6 +45,10 @@ impl Inst {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InstKind {
+    #[allow(unused)] // TODO: remove it later
+    Jump {
+        target: usize,
+    },
     Copy {
         lhs: usize,
         rhs: usize,
@@ -102,6 +106,9 @@ pub mod testing {
     pub mod insts {
         use crate::sir::{BuiltinKind, Inst, InstKind, Literal};
         use std::sync::Arc;
+        pub fn jump(target: usize) -> Inst {
+            Inst::new(InstKind::Jump { target })
+        }
         pub fn copy(lhs: usize, rhs: usize) -> Inst {
             Inst::new(InstKind::Copy { lhs, rhs })
         }
