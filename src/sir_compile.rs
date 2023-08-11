@@ -79,6 +79,9 @@ fn liveness_bb(
                 alive.remove(*lhs);
                 alive.insert(*rhs);
             }
+            InstKind::Drop { rhs } => {
+                alive.insert(*rhs);
+            }
             InstKind::Literal { lhs, .. } => {
                 alive.remove(*lhs);
             }
@@ -112,6 +115,7 @@ fn get_block_liveness(
         .unwrap_or_else(|| BitSet::default())
 }
 
+// Also inserts Drop when necessary
 fn insert_copy(cctx: &CCtx, function: &mut Function, live_in: &HashMap<Id, BitSet<usize>>) {
     for bb in &mut function.body {
         insert_copy_bb(cctx, &mut function.num_vars, bb, live_in);
@@ -124,6 +128,7 @@ fn insert_copy_bb(
     live_in: &HashMap<Id, BitSet<usize>>,
 ) {
     let mut copied_var_for = HashMap::new();
+    let mut dropped_var_for = HashMap::new();
     for (i, inst) in bb.insts.iter().enumerate() {
         let rhs = moved_rhs_of(inst);
         if let Some(rhs) = rhs {
@@ -141,6 +146,21 @@ fn insert_copy_bb(
                 *num_vars += 1;
             }
         }
+        let lhs = lhs_of(inst);
+        if let Some(lhs) = lhs {
+            let used_next = if i + 1 < bb.insts.len() {
+                if let Some(live_in) = live_in.get(&bb.insts[i + 1].id) {
+                    live_in.contains(lhs)
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+            if !used_next {
+                dropped_var_for.insert(inst.id, lhs);
+            }
+        }
     }
     let old_insts = mem::replace(&mut bb.insts, vec![]);
     for mut inst in old_insts {
@@ -151,7 +171,12 @@ fn insert_copy_bb(
             }));
             replace_moved_rhs(&mut inst, *copied_var);
         }
+        let id = inst.id;
         bb.insts.push(inst);
+        if let Some(dropped_var) = dropped_var_for.get(&id) {
+            bb.insts
+                .push(Inst::new(InstKind::Drop { rhs: *dropped_var }));
+        }
     }
 }
 
@@ -161,6 +186,7 @@ fn moved_rhs_of(bb: &Inst) -> Option<usize> {
         InstKind::Branch { cond, .. } => Some(*cond),
         InstKind::Return => None,
         InstKind::Copy { .. } => None,
+        InstKind::Drop { rhs } => Some(*rhs),
         InstKind::Literal { .. } => None,
         InstKind::PushArg { value_ref } => Some(*value_ref),
         InstKind::CallBuiltin { .. } => None,
@@ -181,6 +207,9 @@ fn replace_moved_rhs(bb: &mut Inst, to: usize) {
         InstKind::Copy { .. } => {
             unreachable!();
         }
+        InstKind::Drop { rhs } => {
+            *rhs = to;
+        }
         InstKind::Literal { .. } => {
             unreachable!();
         }
@@ -190,6 +219,19 @@ fn replace_moved_rhs(bb: &mut Inst, to: usize) {
         InstKind::CallBuiltin { .. } => {
             unreachable!();
         }
+    }
+}
+
+fn lhs_of(inst: &Inst) -> Option<usize> {
+    match &inst.kind {
+        InstKind::Jump { .. } => None,
+        InstKind::Branch { .. } => None,
+        InstKind::Return => None,
+        InstKind::Copy { lhs, .. } => Some(*lhs),
+        InstKind::Drop { .. } => None,
+        InstKind::Literal { lhs, .. } => Some(*lhs),
+        InstKind::PushArg { .. } => None,
+        InstKind::CallBuiltin { lhs, .. } => *lhs,
     }
 }
 
@@ -226,6 +268,34 @@ mod tests {
                     insts::puts(),
                     insts::push_arg(x),
                     insts::puts(),
+                    insts::string_literal(x, "Hello, world!"),
+                    insts::push_arg(x),
+                    insts::puts(),
+                    insts::return_(),
+                ])]
+            })
+        );
+    }
+
+    #[test]
+    fn test_compile_drop() {
+        let cctx = CCtx::new();
+        let bb = Function::describe(|(x,)| {
+            vec![BasicBlock::new(vec![
+                insts::string_literal(x, "dummy"),
+                insts::string_literal(x, "Hello, world!"),
+                insts::push_arg(x),
+                insts::puts(),
+                insts::return_(),
+            ])]
+        });
+        let bb = compile(&cctx, &bb);
+        assert_eq!(
+            bb,
+            Function::describe(|(x,)| {
+                vec![BasicBlock::new(vec![
+                    insts::string_literal(x, "dummy"),
+                    insts::drop(x),
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),

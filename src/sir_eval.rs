@@ -50,6 +50,9 @@ fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> Option<usize
             InstKind::Copy { lhs, rhs } => {
                 state.vars[*lhs] = Some(state.vars[*rhs].as_ref().unwrap().clone());
             }
+            InstKind::Drop { rhs } => {
+                state.vars[*rhs] = None;
+            }
             InstKind::Literal { lhs, value } => {
                 state.vars[*lhs] = Some(Value::from(value.clone()));
             }

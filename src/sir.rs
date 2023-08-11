@@ -62,6 +62,9 @@ pub enum InstKind {
         lhs: usize,
         rhs: usize,
     },
+    Drop {
+        rhs: usize,
+    },
     Literal {
         lhs: usize,
         value: Literal,
@@ -80,6 +83,7 @@ impl InstKind {
         match self {
             InstKind::Jump { .. } | InstKind::Branch { .. } | InstKind::Return => true,
             InstKind::Copy { .. }
+            | InstKind::Drop { .. }
             | InstKind::Literal { .. }
             | InstKind::PushArg { .. }
             | InstKind::CallBuiltin { .. } => false,
@@ -149,6 +153,9 @@ pub mod testing {
         }
         pub fn copy(lhs: usize, rhs: usize) -> Inst {
             Inst::new(InstKind::Copy { lhs, rhs })
+        }
+        pub fn drop(rhs: usize) -> Inst {
+            Inst::new(InstKind::Drop { rhs })
         }
         pub fn integer_literal(lhs: usize, value: i32) -> Inst {
             Inst::new(InstKind::Literal {

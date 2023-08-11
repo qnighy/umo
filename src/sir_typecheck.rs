@@ -137,6 +137,7 @@ fn typecheck_bb(
             InstKind::Copy { lhs, rhs } => {
                 ty_ctx.unify(&state.vars[*lhs], &state.vars[*rhs])?;
             }
+            InstKind::Drop { .. } => {}
             InstKind::Literal { lhs, value } => {
                 ty_ctx.unify(&state.vars[*lhs], &Type::of_literal(value))?;
             }
