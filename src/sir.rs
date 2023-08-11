@@ -69,7 +69,9 @@ pub enum InstKind {
         branch_then: usize,
         branch_else: usize,
     },
-    Return,
+    Return {
+        rhs: usize,
+    },
     Copy {
         lhs: usize,
         rhs: usize,
@@ -93,7 +95,7 @@ pub enum InstKind {
 impl InstKind {
     pub fn is_tail(&self) -> bool {
         match self {
-            InstKind::Jump { .. } | InstKind::Branch { .. } | InstKind::Return => true,
+            InstKind::Jump { .. } | InstKind::Branch { .. } | InstKind::Return { .. } => true,
             InstKind::Copy { .. }
             | InstKind::Drop { .. }
             | InstKind::Literal { .. }
@@ -108,6 +110,7 @@ impl InstKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Literal {
+    Unit,
     // TODO: use BigInt
     Integer(i32),
     #[allow(unused)] // TODO: remove it later
@@ -240,14 +243,20 @@ pub mod testing {
                 branch_else,
             })
         }
-        pub fn return_() -> Inst {
-            Inst::new(InstKind::Return)
+        pub fn return_(rhs: usize) -> Inst {
+            Inst::new(InstKind::Return { rhs })
         }
         pub fn copy(lhs: usize, rhs: usize) -> Inst {
             Inst::new(InstKind::Copy { lhs, rhs })
         }
         pub fn drop(rhs: usize) -> Inst {
             Inst::new(InstKind::Drop { rhs })
+        }
+        pub fn unit_literal(lhs: usize) -> Inst {
+            Inst::new(InstKind::Literal {
+                lhs,
+                value: Literal::Unit,
+            })
         }
         pub fn integer_literal(lhs: usize, value: i32) -> Inst {
             Inst::new(InstKind::Literal {

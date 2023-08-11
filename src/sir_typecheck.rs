@@ -46,6 +46,7 @@ impl TyCtx {
                 self.ty_vars[*id2] = Some(ty1.clone());
                 Ok(())
             }
+            (Type::Unit, Type::Unit) => Ok(()),
             (Type::String, Type::String) => Ok(()),
             (Type::Integer, Type::Integer) => Ok(()),
             (Type::Bool, Type::Bool) => Ok(()),
@@ -63,6 +64,7 @@ impl TyCtx {
                     false
                 }
             }
+            Type::Unit => false,
             Type::String => false,
             Type::Integer => false,
             Type::Bool => false,
@@ -77,6 +79,7 @@ impl TyCtx {
                     true
                 }
             }
+            Type::Unit => false,
             Type::String => false,
             Type::Integer => false,
             Type::Bool => false,
@@ -140,7 +143,10 @@ fn typecheck_bb(
                 }
                 ty_ctx.unify(&state.vars[*cond], &Type::Bool)?;
             }
-            InstKind::Return => {}
+            InstKind::Return { rhs } => {
+                // TODO: use return type
+                ty_ctx.unify(&state.vars[*rhs], &Type::Unit)?;
+            }
             InstKind::Copy { lhs, rhs } => {
                 ty_ctx.unify(&state.vars[*lhs], &state.vars[*rhs])?;
             }
@@ -194,20 +200,21 @@ fn typecheck_builtin(
                 return Err(TypeError);
             }
             ty_ctx.unify(&args[0], &Type::String)?;
-            Ok(Type::Integer)
+            Ok(Type::Unit)
         }
         BuiltinKind::Puti => {
             if args.len() != 1 {
                 return Err(TypeError);
             }
             ty_ctx.unify(&args[0], &Type::Integer)?;
-            Ok(Type::Integer)
+            Ok(Type::Unit)
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Type {
+    Unit,
     String,
     Integer,
     Bool,
@@ -217,6 +224,7 @@ enum Type {
 impl Type {
     fn of_literal(literal: &Literal) -> Self {
         match literal {
+            Literal::Unit => Self::Unit,
             Literal::Integer(_) => Self::Integer,
             Literal::Bool(_) => Self::Bool,
             Literal::String(_) => Self::String,
@@ -233,14 +241,15 @@ mod tests {
     #[test]
     fn test_typecheck_success() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
+        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x, tmp1), (entry,)| {
             desc.block(
                 entry,
                 vec![
                     insts::integer_literal(x, 42),
                     insts::push_arg(x),
                     insts::puti(),
-                    insts::return_(),
+                    insts::unit_literal(tmp1),
+                    insts::return_(tmp1),
                 ],
             );
         }));
@@ -250,21 +259,27 @@ mod tests {
     #[test]
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
-        let program_unit =
-            ProgramUnit::simple(Function::simple(|()| vec![insts::puti(), insts::return_()]));
+        let program_unit = ProgramUnit::simple(Function::simple(|(tmp1,)| {
+            vec![
+                insts::puti(),
+                insts::unit_literal(tmp1),
+                insts::return_(tmp1),
+            ]
+        }));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }
 
     #[test]
     fn test_typecheck_failure_too_many_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+        let program_unit = ProgramUnit::simple(Function::simple(|(x, tmp1)| {
             vec![
                 insts::integer_literal(x, 42),
                 insts::push_arg(x),
                 insts::push_arg(x),
                 insts::puti(),
-                insts::return_(),
+                insts::unit_literal(tmp1),
+                insts::return_(tmp1),
             ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
@@ -273,12 +288,13 @@ mod tests {
     #[test]
     fn test_typecheck_failure_arg_type_mismatch() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+        let program_unit = ProgramUnit::simple(Function::simple(|(x, tmp1)| {
             vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
                 insts::puti(),
-                insts::return_(),
+                insts::unit_literal(tmp1),
+                insts::return_(tmp1),
             ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
@@ -287,11 +303,12 @@ mod tests {
     #[test]
     fn test_typecheck_failure_runaway_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+        let program_unit = ProgramUnit::simple(Function::simple(|(x, tmp1)| {
             vec![
                 insts::string_literal(x, "Hello, world!"),
+                insts::unit_literal(tmp1),
                 insts::push_arg(x),
-                insts::return_(),
+                insts::return_(tmp1),
             ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());

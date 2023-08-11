@@ -25,12 +25,13 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::simple(|(x,)| {
+            &ProgramUnit::simple(Function::simple(|(x, tmp1)| {
                 vec![
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
-                    insts::return_(),
+                    insts::unit_literal(tmp1),
+                    insts::return_(tmp1),
                 ]
             })),
         );
@@ -42,7 +43,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::describe(|desc, (x,), (entry, label1)| {
+            &ProgramUnit::simple(Function::describe(|desc, (x, tmp1), (entry, label1)| {
                 desc.block(
                     entry,
                     vec![
@@ -52,7 +53,12 @@ mod tests {
                 );
                 desc.block(
                     label1,
-                    vec![insts::push_arg(x), insts::puts(), insts::return_()],
+                    vec![
+                        insts::push_arg(x),
+                        insts::puts(),
+                        insts::unit_literal(tmp1),
+                        insts::return_(tmp1),
+                    ],
                 );
             })),
         );
@@ -64,7 +70,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::simple(|(tmp1, tmp2, x)| {
+            &ProgramUnit::simple(Function::simple(|(tmp1, tmp2, x, tmp3)| {
                 vec![
                     insts::integer_literal(tmp1, 1),
                     insts::integer_literal(tmp2, 1),
@@ -73,7 +79,8 @@ mod tests {
                     insts::add(x),
                     insts::push_arg(x),
                     insts::puti(),
-                    insts::return_(),
+                    insts::unit_literal(tmp3),
+                    insts::return_(tmp3),
                 ]
             })),
         );
@@ -86,7 +93,7 @@ mod tests {
         eval(
             &ctx,
             &ProgramUnit::simple(Function::describe(
-                |desc, (x, s), (entry, branch_then, branch_else)| {
+                |desc, (x, s, tmp1), (entry, branch_then, branch_else)| {
                     desc.block(
                         entry,
                         vec![
@@ -100,7 +107,8 @@ mod tests {
                             insts::string_literal(s, "x is true"),
                             insts::push_arg(s),
                             insts::puts(),
-                            insts::return_(),
+                            insts::unit_literal(tmp1),
+                            insts::return_(tmp1),
                         ],
                     );
                     desc.block(
@@ -109,7 +117,8 @@ mod tests {
                             insts::string_literal(s, "x is false"),
                             insts::push_arg(s),
                             insts::puts(),
-                            insts::return_(),
+                            insts::unit_literal(tmp1),
+                            insts::return_(tmp1),
                         ],
                     );
                 },
@@ -124,7 +133,7 @@ mod tests {
         eval(
             &ctx,
             &ProgramUnit::simple(Function::describe(
-                |desc, (x, s), (entry, branch_then, branch_else)| {
+                |desc, (x, s, tmp1), (entry, branch_then, branch_else)| {
                     desc.block(
                         entry,
                         vec![
@@ -138,7 +147,8 @@ mod tests {
                             insts::string_literal(s, "x is true"),
                             insts::push_arg(s),
                             insts::puts(),
-                            insts::return_(),
+                            insts::unit_literal(tmp1),
+                            insts::return_(tmp1),
                         ],
                     );
                     desc.block(
@@ -147,7 +157,8 @@ mod tests {
                             insts::string_literal(s, "x is false"),
                             insts::push_arg(s),
                             insts::puts(),
-                            insts::return_(),
+                            insts::unit_literal(tmp1),
+                            insts::return_(tmp1),
                         ],
                     );
                 },
@@ -170,7 +181,7 @@ mod tests {
         eval(
             &ctx,
             &ProgramUnit::simple(Function::describe(
-                |desc, (sum, i, tmp1, tmp2, tmp3), (entry, cond, body, end)| {
+                |desc, (sum, i, tmp1, tmp2, tmp3, tmp4), (entry, cond, body, end)| {
                     desc.block(
                         entry,
                         vec![
@@ -218,7 +229,8 @@ mod tests {
                             insts::push_arg(sum),
                             insts::puti(),
                             // return;
-                            insts::return_(),
+                            insts::unit_literal(tmp4),
+                            insts::return_(tmp4),
                         ],
                     );
                 },

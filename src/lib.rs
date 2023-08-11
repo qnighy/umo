@@ -18,7 +18,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
         eval_::eval(
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
-                1,
+                2,
                 vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 0,
@@ -29,7 +29,11 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         lhs: None,
                         builtin: sir::BuiltinKind::Puts,
                     }),
-                    sir::Inst::new(sir::InstKind::Return),
+                    sir::Inst::new(sir::InstKind::Literal {
+                        lhs: 1,
+                        value: sir::Literal::Unit,
+                    }),
+                    sir::Inst::new(sir::InstKind::Return { rhs: 1 }),
                 ])],
             )]),
         );
@@ -37,7 +41,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
         eval_::eval(
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
-                3,
+                4,
                 vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 0,
@@ -58,7 +62,11 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         lhs: None,
                         builtin: sir::BuiltinKind::Puti,
                     }),
-                    sir::Inst::new(sir::InstKind::Return),
+                    sir::Inst::new(sir::InstKind::Literal {
+                        lhs: 3,
+                        value: sir::Literal::Unit,
+                    }),
+                    sir::Inst::new(sir::InstKind::Return { rhs: 3 }),
                 ])],
             )]),
         );

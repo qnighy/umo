@@ -80,8 +80,9 @@ fn liveness_bb(
                 alive.union_with(&get_block_liveness(function, live_in, branch_else));
                 alive.insert(*cond);
             }
-            InstKind::Return => {
+            InstKind::Return { rhs } => {
                 alive = BitSet::default();
+                alive.insert(*rhs);
             }
             InstKind::Copy { lhs, rhs } => {
                 alive.remove(*lhs);
@@ -192,7 +193,7 @@ fn moved_rhs_of(inst: &Inst) -> Option<usize> {
     match &inst.kind {
         InstKind::Jump { .. } => None,
         InstKind::Branch { cond, .. } => Some(*cond),
-        InstKind::Return => None,
+        InstKind::Return { rhs } => Some(*rhs),
         InstKind::Copy { .. } => None,
         InstKind::Drop { rhs } => Some(*rhs),
         InstKind::Literal { .. } => None,
@@ -209,8 +210,8 @@ fn replace_moved_rhs(inst: &mut Inst, to: usize) {
         InstKind::Branch { cond, .. } => {
             *cond = to;
         }
-        InstKind::Return => {
-            unreachable!();
+        InstKind::Return { rhs } => {
+            *rhs = to;
         }
         InstKind::Copy { .. } => {
             unreachable!();
@@ -234,7 +235,7 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
     match &inst.kind {
         InstKind::Jump { .. } => None,
         InstKind::Branch { .. } => None,
-        InstKind::Return => None,
+        InstKind::Return { .. } => None,
         InstKind::Copy { lhs, .. } => Some(*lhs),
         InstKind::Drop { .. } => None,
         InstKind::Literal { lhs, .. } => Some(*lhs),
@@ -252,7 +253,7 @@ mod tests {
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+        let program_unit = ProgramUnit::simple(Function::simple(|(x, tmp1)| {
             vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
@@ -262,24 +263,26 @@ mod tests {
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
                 insts::puts(),
-                insts::return_(),
+                insts::unit_literal(tmp1),
+                insts::return_(tmp1),
             ]
         }));
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(|(x, tmp1)| {
+            ProgramUnit::simple(Function::simple(|(x, tmp1, tmp2)| {
                 vec![
                     insts::string_literal(x, "Hello, world!"),
-                    insts::copy(tmp1, x),
-                    insts::push_arg(tmp1),
+                    insts::copy(tmp2, x),
+                    insts::push_arg(tmp2),
                     insts::puts(),
                     insts::push_arg(x),
                     insts::puts(),
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
-                    insts::return_(),
+                    insts::unit_literal(tmp1),
+                    insts::return_(tmp1),
                 ]
             }))
         );
@@ -288,26 +291,28 @@ mod tests {
     #[test]
     fn test_compile_drop() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+        let program_unit = ProgramUnit::simple(Function::simple(|(x, tmp1)| {
             vec![
                 insts::string_literal(x, "dummy"),
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
                 insts::puts(),
-                insts::return_(),
+                insts::unit_literal(tmp1),
+                insts::return_(tmp1),
             ]
         }));
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(|(x,)| {
+            ProgramUnit::simple(Function::simple(|(x, tmp1)| {
                 vec![
                     insts::string_literal(x, "dummy"),
                     insts::drop(x),
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
-                    insts::return_(),
+                    insts::unit_literal(tmp1),
+                    insts::return_(tmp1),
                 ]
             }))
         );

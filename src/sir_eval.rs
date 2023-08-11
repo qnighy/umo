@@ -13,7 +13,7 @@ struct State {
 pub fn eval1(ctx: &dyn RtCtx, program_unit: &ProgramUnit) {
     eval1_function(ctx, &program_unit.functions[0]);
 }
-fn eval1_function(ctx: &dyn RtCtx, function: &Function) {
+fn eval1_function(ctx: &dyn RtCtx, function: &Function) -> Value {
     let mut state = State {
         vars: vec![None; function.num_vars],
         args: vec![],
@@ -21,18 +21,26 @@ fn eval1_function(ctx: &dyn RtCtx, function: &Function) {
     let mut current_bb_id = 0;
     loop {
         let bb = &function.body[current_bb_id];
-        if let Some(next_bb_id) = eval1_bb(ctx, &mut state, bb) {
-            current_bb_id = next_bb_id;
-        } else {
-            break;
+        match eval1_bb(ctx, &mut state, bb) {
+            BlockResult::Return(value) => {
+                return value;
+            }
+            BlockResult::Jump(next_bb_id) => {
+                current_bb_id = next_bb_id;
+            }
         }
     }
 }
-fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> Option<usize> {
+#[derive(Debug)]
+enum BlockResult {
+    Return(Value),
+    Jump(usize),
+}
+fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> BlockResult {
     for inst in &bb.insts {
         match &inst.kind {
             InstKind::Jump { target } => {
-                return Some(*target);
+                return BlockResult::Jump(*target);
             }
             InstKind::Branch {
                 cond,
@@ -45,10 +53,10 @@ fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> Option<usize
                 } else {
                     panic!("Expected integer");
                 };
-                return Some(if cond { *branch_then } else { *branch_else });
+                return BlockResult::Jump(if cond { *branch_then } else { *branch_else });
             }
-            InstKind::Return => {
-                return None;
+            InstKind::Return { rhs } => {
+                return BlockResult::Return(state.vars[*rhs].as_ref().unwrap().clone());
             }
             InstKind::Copy { lhs, rhs } => {
                 state.vars[*lhs] = Some(state.vars[*rhs].as_ref().unwrap().clone());
@@ -127,6 +135,7 @@ enum Value {
 impl From<Literal> for Value {
     fn from(l: Literal) -> Self {
         match l {
+            Literal::Unit => Value::Integer(0),
             Literal::String(s) => Value::String(s),
             Literal::Integer(i) => Value::Integer(i),
             Literal::Bool(b) => Value::Integer(b as i32),
