@@ -250,28 +250,22 @@ mod tests {
     #[test]
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple({
-            Function::describe(|desc, (), (entry,)| {
-                desc.block(entry, vec![insts::puti(), insts::return_()]);
-            })
-        });
+        let program_unit =
+            ProgramUnit::simple(Function::simple(|()| vec![insts::puti(), insts::return_()]));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }
 
     #[test]
     fn test_typecheck_failure_too_many_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
-            desc.block(
-                entry,
-                vec![
-                    insts::integer_literal(x, 42),
-                    insts::push_arg(x),
-                    insts::push_arg(x),
-                    insts::puti(),
-                    insts::return_(),
-                ],
-            );
+        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+            vec![
+                insts::integer_literal(x, 42),
+                insts::push_arg(x),
+                insts::push_arg(x),
+                insts::puti(),
+                insts::return_(),
+            ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }
@@ -279,16 +273,13 @@ mod tests {
     #[test]
     fn test_typecheck_failure_arg_type_mismatch() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
-            desc.block(
-                entry,
-                vec![
-                    insts::string_literal(x, "Hello, world!"),
-                    insts::push_arg(x),
-                    insts::puti(),
-                    insts::return_(),
-                ],
-            );
+        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+            vec![
+                insts::string_literal(x, "Hello, world!"),
+                insts::push_arg(x),
+                insts::puti(),
+                insts::return_(),
+            ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }
@@ -296,15 +287,12 @@ mod tests {
     #[test]
     fn test_typecheck_failure_runaway_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
-            desc.block(
-                entry,
-                vec![
-                    insts::string_literal(x, "Hello, world!"),
-                    insts::push_arg(x),
-                    insts::return_(),
-                ],
-            );
+        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+            vec![
+                insts::string_literal(x, "Hello, world!"),
+                insts::push_arg(x),
+                insts::return_(),
+            ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }

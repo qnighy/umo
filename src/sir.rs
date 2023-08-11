@@ -185,6 +185,11 @@ pub mod testing {
             VS: SeqGen,
             BS: SeqGen,
             F: FnOnce(&mut FunctionDescriber, VS, BS);
+
+        fn simple<VS, F>(f: F) -> Self
+        where
+            VS: SeqGen,
+            F: FnOnce(VS) -> Vec<Inst>;
     }
 
     impl FunctionTestingExt for Function {
@@ -199,6 +204,14 @@ pub mod testing {
             };
             f(&mut desc, VS::seq(), BS::seq());
             desc.function
+        }
+
+        fn simple<VS, F>(f: F) -> Self
+        where
+            VS: SeqGen,
+            F: FnOnce(VS) -> Vec<Inst>,
+        {
+            Self::new(VS::size(), vec![BasicBlock::new(f(VS::seq()))])
         }
     }
 

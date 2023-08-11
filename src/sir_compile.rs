@@ -252,12 +252,27 @@ mod tests {
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
-            desc.block(
-                entry,
+        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+            vec![
+                insts::string_literal(x, "Hello, world!"),
+                insts::push_arg(x),
+                insts::puts(),
+                insts::push_arg(x),
+                insts::puts(),
+                insts::string_literal(x, "Hello, world!"),
+                insts::push_arg(x),
+                insts::puts(),
+                insts::return_(),
+            ]
+        }));
+        let program_unit = compile(&cctx, &program_unit);
+        assert_eq!(
+            program_unit,
+            ProgramUnit::simple(Function::simple(|(x, tmp1)| {
                 vec![
                     insts::string_literal(x, "Hello, world!"),
-                    insts::push_arg(x),
+                    insts::copy(tmp1, x),
+                    insts::push_arg(tmp1),
                     insts::puts(),
                     insts::push_arg(x),
                     insts::puts(),
@@ -265,28 +280,7 @@ mod tests {
                     insts::push_arg(x),
                     insts::puts(),
                     insts::return_(),
-                ],
-            );
-        }));
-        let program_unit = compile(&cctx, &program_unit);
-        assert_eq!(
-            program_unit,
-            ProgramUnit::simple(Function::describe(|desc, (x, tmp1), (entry,)| {
-                desc.block(
-                    entry,
-                    vec![
-                        insts::string_literal(x, "Hello, world!"),
-                        insts::copy(tmp1, x),
-                        insts::push_arg(tmp1),
-                        insts::puts(),
-                        insts::push_arg(x),
-                        insts::puts(),
-                        insts::string_literal(x, "Hello, world!"),
-                        insts::push_arg(x),
-                        insts::puts(),
-                        insts::return_(),
-                    ],
-                );
+                ]
             }))
         );
     }
@@ -294,33 +288,27 @@ mod tests {
     #[test]
     fn test_compile_drop() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
-            desc.block(
-                entry,
-                vec![
-                    insts::string_literal(x, "dummy"),
-                    insts::string_literal(x, "Hello, world!"),
-                    insts::push_arg(x),
-                    insts::puts(),
-                    insts::return_(),
-                ],
-            );
+        let program_unit = ProgramUnit::simple(Function::simple(|(x,)| {
+            vec![
+                insts::string_literal(x, "dummy"),
+                insts::string_literal(x, "Hello, world!"),
+                insts::push_arg(x),
+                insts::puts(),
+                insts::return_(),
+            ]
         }));
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
-                desc.block(
-                    entry,
-                    vec![
-                        insts::string_literal(x, "dummy"),
-                        insts::drop(x),
-                        insts::string_literal(x, "Hello, world!"),
-                        insts::push_arg(x),
-                        insts::puts(),
-                        insts::return_(),
-                    ],
-                );
+            ProgramUnit::simple(Function::simple(|(x,)| {
+                vec![
+                    insts::string_literal(x, "dummy"),
+                    insts::drop(x),
+                    insts::string_literal(x, "Hello, world!"),
+                    insts::push_arg(x),
+                    insts::puts(),
+                    insts::return_(),
+                ]
             }))
         );
     }

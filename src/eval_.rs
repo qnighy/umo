@@ -25,16 +25,13 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
-                desc.block(
-                    entry,
-                    vec![
-                        insts::string_literal(x, "Hello, world!"),
-                        insts::push_arg(x),
-                        insts::puts(),
-                        insts::return_(),
-                    ],
-                );
+            &ProgramUnit::simple(Function::simple(|(x,)| {
+                vec![
+                    insts::string_literal(x, "Hello, world!"),
+                    insts::push_arg(x),
+                    insts::puts(),
+                    insts::return_(),
+                ]
             })),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
@@ -67,20 +64,17 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::describe(|desc, (tmp1, tmp2, x), (entry,)| {
-                desc.block(
-                    entry,
-                    vec![
-                        insts::integer_literal(tmp1, 1),
-                        insts::integer_literal(tmp2, 1),
-                        insts::push_arg(tmp1),
-                        insts::push_arg(tmp2),
-                        insts::add(x),
-                        insts::push_arg(x),
-                        insts::puti(),
-                        insts::return_(),
-                    ],
-                );
+            &ProgramUnit::simple(Function::simple(|(tmp1, tmp2, x)| {
+                vec![
+                    insts::integer_literal(tmp1, 1),
+                    insts::integer_literal(tmp2, 1),
+                    insts::push_arg(tmp1),
+                    insts::push_arg(tmp2),
+                    insts::add(x),
+                    insts::push_arg(x),
+                    insts::puti(),
+                    insts::return_(),
+                ]
             })),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "2\n");
