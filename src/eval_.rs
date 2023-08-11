@@ -25,7 +25,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::simple(|(x, tmp1)| {
+            &ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
                 vec![
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
@@ -43,7 +43,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::describe(|desc, (x, tmp1), (entry, label1)| {
+            &ProgramUnit::simple(Function::describe(0, |desc, (x, tmp1), (entry, label1)| {
                 desc.block(
                     entry,
                     vec![
@@ -70,7 +70,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::simple(|(tmp1, tmp2, x, tmp3)| {
+            &ProgramUnit::simple(Function::simple(0, |(tmp1, tmp2, x, tmp3)| {
                 vec![
                     insts::integer_literal(tmp1, 1),
                     insts::integer_literal(tmp2, 1),
@@ -93,6 +93,7 @@ mod tests {
         eval(
             &ctx,
             &ProgramUnit::simple(Function::describe(
+                0,
                 |desc, (x, s, tmp1), (entry, branch_then, branch_else)| {
                     desc.block(
                         entry,
@@ -133,6 +134,7 @@ mod tests {
         eval(
             &ctx,
             &ProgramUnit::simple(Function::describe(
+                0,
                 |desc, (x, s, tmp1), (entry, branch_then, branch_else)| {
                     desc.block(
                         entry,
@@ -181,6 +183,7 @@ mod tests {
         eval(
             &ctx,
             &ProgramUnit::simple(Function::describe(
+                0,
                 |desc, (sum, i, tmp1, tmp2, tmp3, tmp4), (entry, cond, body, end)| {
                     desc.block(
                         entry,

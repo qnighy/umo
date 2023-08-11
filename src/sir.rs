@@ -17,14 +17,20 @@ impl ProgramUnit {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Function {
+    /// Number of arguments, Must be <= num_vars
+    pub num_args: usize,
+    /// Number of local variables, including args
     pub num_vars: usize,
-    // pub num_args: usize,
     pub body: Vec<BasicBlock>,
 }
 
 impl Function {
-    pub fn new(num_vars: usize, body: Vec<BasicBlock>) -> Self {
-        Self { num_vars, body }
+    pub fn new(num_args: usize, num_vars: usize, body: Vec<BasicBlock>) -> Self {
+        Self {
+            num_args,
+            num_vars,
+            body,
+        }
     }
 }
 
@@ -151,6 +157,7 @@ pub mod testing {
                 program_unit: ProgramUnit {
                     functions: vec![
                         Function {
+                            num_args: 0,
                             num_vars: 0,
                             body: vec![]
                         };
@@ -183,38 +190,42 @@ pub mod testing {
     }
 
     pub trait FunctionTestingExt {
-        fn describe<VS, BS, F>(f: F) -> Self
+        fn describe<VS, BS, F>(num_args: usize, f: F) -> Self
         where
             VS: SeqGen,
             BS: SeqGen,
             F: FnOnce(&mut FunctionDescriber, VS, BS);
 
-        fn simple<VS, F>(f: F) -> Self
+        fn simple<VS, F>(num_args: usize, f: F) -> Self
         where
             VS: SeqGen,
             F: FnOnce(VS) -> Vec<Inst>;
     }
 
     impl FunctionTestingExt for Function {
-        fn describe<VS, BS, F>(f: F) -> Self
+        fn describe<VS, BS, F>(num_args: usize, f: F) -> Self
         where
             VS: SeqGen,
             BS: SeqGen,
             F: FnOnce(&mut FunctionDescriber, VS, BS),
         {
             let mut desc = FunctionDescriber {
-                function: Self::new(VS::size(), vec![BasicBlock { insts: vec![] }; BS::size()]),
+                function: Self::new(
+                    num_args,
+                    VS::size(),
+                    vec![BasicBlock { insts: vec![] }; BS::size()],
+                ),
             };
             f(&mut desc, VS::seq(), BS::seq());
             desc.function
         }
 
-        fn simple<VS, F>(f: F) -> Self
+        fn simple<VS, F>(num_args: usize, f: F) -> Self
         where
             VS: SeqGen,
             F: FnOnce(VS) -> Vec<Inst>,
         {
-            Self::new(VS::size(), vec![BasicBlock::new(f(VS::seq()))])
+            Self::new(num_args, VS::size(), vec![BasicBlock::new(f(VS::seq()))])
         }
     }
 

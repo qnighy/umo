@@ -18,6 +18,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
         eval_::eval(
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
+                0,
                 2,
                 vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
@@ -41,6 +42,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
         eval_::eval(
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
+                0,
                 4,
                 vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {

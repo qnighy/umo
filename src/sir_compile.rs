@@ -126,12 +126,18 @@ fn get_block_liveness(
 
 // Also inserts Drop when necessary
 fn insert_copy(cctx: &CCtx, function: &mut Function, live_in: &HashMap<Id, BitSet<usize>>) {
-    for bb in &mut function.body {
-        insert_copy_bb(cctx, &mut function.num_vars, bb, live_in);
+    for (i, bb) in function.body.iter_mut().enumerate() {
+        let num_args = if i == 0 {
+            Some(function.num_args)
+        } else {
+            None
+        };
+        insert_copy_bb(cctx, num_args, &mut function.num_vars, bb, live_in);
     }
 }
 fn insert_copy_bb(
     _cctx: &CCtx,
+    num_args: Option<usize>,
     num_vars: &mut usize,
     bb: &mut BasicBlock,
     live_in: &HashMap<Id, BitSet<usize>>,
@@ -172,6 +178,14 @@ fn insert_copy_bb(
         }
     }
     let old_insts = mem::replace(&mut bb.insts, vec![]);
+    if let Some(num_args) = num_args {
+        // Drop arguments if it is unused
+        for arg_id in 0..num_args {
+            if !live_in.get(&old_insts[0].id).unwrap().contains(arg_id) {
+                bb.insts.push(Inst::new(InstKind::Drop { rhs: arg_id }));
+            }
+        }
+    }
     for mut inst in old_insts {
         if let Some(copied_var) = copied_var_for.get(&inst.id) {
             bb.insts.push(Inst::new(InstKind::Copy {
@@ -253,7 +267,7 @@ mod tests {
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(|(x, tmp1)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
             vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
@@ -270,7 +284,7 @@ mod tests {
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(|(x, tmp1, tmp2)| {
+            ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
                 vec![
                     insts::string_literal(x, "Hello, world!"),
                     insts::copy(tmp2, x),
@@ -291,7 +305,7 @@ mod tests {
     #[test]
     fn test_compile_drop() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(|(x, tmp1)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
             vec![
                 insts::string_literal(x, "dummy"),
                 insts::string_literal(x, "Hello, world!"),
@@ -304,13 +318,32 @@ mod tests {
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(|(x, tmp1)| {
+            ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
                 vec![
                     insts::string_literal(x, "dummy"),
                     insts::drop(x),
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
+                    insts::unit_literal(tmp1),
+                    insts::return_(tmp1),
+                ]
+            }))
+        );
+    }
+
+    #[test]
+    fn test_compile_drop_arg() {
+        let cctx = CCtx::new();
+        let program_unit = ProgramUnit::simple(Function::simple(1, |(_arg1, tmp1)| {
+            vec![insts::unit_literal(tmp1), insts::return_(tmp1)]
+        }));
+        let program_unit = compile(&cctx, &program_unit);
+        assert_eq!(
+            program_unit,
+            ProgramUnit::simple(Function::simple(1, |(arg, tmp1)| {
+                vec![
+                    insts::drop(arg),
                     insts::unit_literal(tmp1),
                     insts::return_(tmp1),
                 ]

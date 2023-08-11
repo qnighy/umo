@@ -11,13 +11,17 @@ struct State {
 }
 
 pub fn eval1(ctx: &dyn RtCtx, program_unit: &ProgramUnit) {
-    eval1_function(ctx, &program_unit.functions[0]);
+    eval1_function(ctx, &program_unit.functions[0], vec![]);
 }
-fn eval1_function(ctx: &dyn RtCtx, function: &Function) -> Value {
+fn eval1_function(ctx: &dyn RtCtx, function: &Function, received_args: Vec<Value>) -> Value {
+    assert!(function.num_args <= function.num_vars);
     let mut state = State {
         vars: vec![None; function.num_vars],
         args: vec![],
     };
+    for (i, received_arg) in received_args.into_iter().enumerate() {
+        state.vars[i] = Some(received_arg);
+    }
     let mut current_bb_id = 0;
     loop {
         let bb = &function.body[current_bb_id];
