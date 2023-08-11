@@ -44,6 +44,9 @@ fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> Option<usize
                 };
                 return Some(if cond { *branch_then } else { *branch_else });
             }
+            InstKind::Return => {
+                return None;
+            }
             InstKind::Copy { lhs, rhs } => {
                 state.vars[*lhs] = Some(state.vars[*rhs].as_ref().unwrap().clone());
             }
@@ -63,7 +66,7 @@ fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> Option<usize
             }
         }
     }
-    None
+    unreachable!("Missing tail instruction");
 }
 
 fn eval_builtin(ctx: &dyn RtCtx, f: BuiltinKind, args: Vec<Value>) -> Value {

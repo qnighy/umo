@@ -29,6 +29,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         lhs: None,
                         builtin: sir::BuiltinKind::Puts,
                     }),
+                    sir::Inst::new(sir::InstKind::Return),
                 ])],
             ),
         );
@@ -57,6 +58,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         lhs: None,
                         builtin: sir::BuiltinKind::Puti,
                     }),
+                    sir::Inst::new(sir::InstKind::Return),
                 ])],
             ),
         );

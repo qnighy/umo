@@ -113,17 +113,12 @@ fn typecheck_bb(
     bb: &BasicBlock,
 ) -> Result<(), TypeError> {
     let mut args = vec![];
-    let mut end_block = false;
     for inst in &bb.insts {
-        if end_block {
-            return Err(TypeError);
-        }
         match &inst.kind {
             InstKind::Jump { target } => {
                 if *target >= function.body.len() {
                     return Err(TypeError);
                 }
-                end_block = true;
             }
             InstKind::Branch {
                 cond,
@@ -137,8 +132,8 @@ fn typecheck_bb(
                     return Err(TypeError);
                 }
                 ty_ctx.unify(&state.vars[*cond], &Type::Bool)?;
-                end_block = true;
             }
+            InstKind::Return => {}
             InstKind::Copy { lhs, rhs } => {
                 ty_ctx.unify(&state.vars[*lhs], &state.vars[*rhs])?;
             }
@@ -235,6 +230,7 @@ mod tests {
                 insts::integer_literal(x, 42),
                 insts::push_arg(x),
                 insts::puti(),
+                insts::return_(),
             ])]
         });
         assert!(typecheck(&cctx, &bb).is_ok());
@@ -243,7 +239,8 @@ mod tests {
     #[test]
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|()| vec![BasicBlock::new(vec![insts::puti()])]);
+        let bb =
+            Function::describe(|()| vec![BasicBlock::new(vec![insts::puti(), insts::return_()])]);
         assert!(typecheck(&cctx, &bb).is_err());
     }
 
@@ -256,6 +253,7 @@ mod tests {
                 insts::push_arg(x),
                 insts::push_arg(x),
                 insts::puti(),
+                insts::return_(),
             ])]
         });
         assert!(typecheck(&cctx, &bb).is_err());
@@ -269,6 +267,7 @@ mod tests {
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
                 insts::puti(),
+                insts::return_(),
             ])]
         });
         assert!(typecheck(&cctx, &bb).is_err());
@@ -281,6 +280,7 @@ mod tests {
             vec![BasicBlock::new(vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
+                insts::return_(),
             ])]
         });
         assert!(typecheck(&cctx, &bb).is_err());

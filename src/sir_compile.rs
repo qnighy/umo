@@ -72,6 +72,9 @@ fn liveness_bb(
                 alive.union_with(&get_block_liveness(function, live_in, branch_else));
                 alive.insert(*cond);
             }
+            InstKind::Return => {
+                alive = BitSet::default();
+            }
             InstKind::Copy { lhs, rhs } => {
                 alive.remove(*lhs);
                 alive.insert(*rhs);
@@ -156,6 +159,7 @@ fn moved_rhs_of(bb: &Inst) -> Option<usize> {
     match &bb.kind {
         InstKind::Jump { .. } => None,
         InstKind::Branch { cond, .. } => Some(*cond),
+        InstKind::Return => None,
         InstKind::Copy { .. } => None,
         InstKind::Literal { .. } => None,
         InstKind::PushArg { value_ref } => Some(*value_ref),
@@ -170,6 +174,9 @@ fn replace_moved_rhs(bb: &mut Inst, to: usize) {
         }
         InstKind::Branch { cond, .. } => {
             *cond = to;
+        }
+        InstKind::Return => {
+            unreachable!();
         }
         InstKind::Copy { .. } => {
             unreachable!();
@@ -205,6 +212,7 @@ mod tests {
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
                 insts::puts(),
+                insts::return_(),
             ])]
         });
         let bb = compile(&cctx, &bb);
@@ -221,6 +229,7 @@ mod tests {
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
+                    insts::return_(),
                 ])]
             })
         );

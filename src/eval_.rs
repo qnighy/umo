@@ -30,6 +30,7 @@ mod tests {
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
+                    insts::return_(),
                 ])]
             }),
         );
@@ -47,7 +48,7 @@ mod tests {
                         insts::string_literal(x, "Hello, world!"),
                         insts::jump(1),
                     ]),
-                    BasicBlock::new(vec![insts::push_arg(x), insts::puts()]),
+                    BasicBlock::new(vec![insts::push_arg(x), insts::puts(), insts::return_()]),
                 ]
             }),
         );
@@ -68,6 +69,7 @@ mod tests {
                     insts::add(x),
                     insts::push_arg(x),
                     insts::puti(),
+                    insts::return_(),
                 ])]
             }),
         );
@@ -86,11 +88,13 @@ mod tests {
                         insts::string_literal(s, "x is true"),
                         insts::push_arg(s),
                         insts::puts(),
+                        insts::return_(),
                     ]),
                     BasicBlock::new(vec![
                         insts::string_literal(s, "x is false"),
                         insts::push_arg(s),
                         insts::puts(),
+                        insts::return_(),
                     ]),
                 ]
             }),
@@ -110,11 +114,13 @@ mod tests {
                         insts::string_literal(s, "x is true"),
                         insts::push_arg(s),
                         insts::puts(),
+                        insts::return_(),
                     ]),
                     BasicBlock::new(vec![
                         insts::string_literal(s, "x is false"),
                         insts::push_arg(s),
                         insts::puts(),
+                        insts::return_(),
                     ]),
                 ]
             }),
@@ -176,6 +182,8 @@ mod tests {
                         // puti(sum);
                         insts::push_arg(sum),
                         insts::puti(),
+                        // return;
+                        insts::return_(),
                     ]),
                 ]
             }),

@@ -24,6 +24,8 @@ pub struct BasicBlock {
 
 impl BasicBlock {
     pub fn new(insts: Vec<Inst>) -> Self {
+        assert!(insts[..insts.len() - 1].iter().all(|i| i.kind.is_middle()));
+        assert!(insts.last().unwrap().kind.is_tail());
         Self { insts }
     }
 }
@@ -55,6 +57,7 @@ pub enum InstKind {
         branch_then: usize,
         branch_else: usize,
     },
+    Return,
     Copy {
         lhs: usize,
         rhs: usize,
@@ -70,6 +73,21 @@ pub enum InstKind {
         lhs: Option<usize>,
         builtin: BuiltinKind,
     },
+}
+
+impl InstKind {
+    pub fn is_tail(&self) -> bool {
+        match self {
+            InstKind::Jump { .. } | InstKind::Branch { .. } | InstKind::Return => true,
+            InstKind::Copy { .. }
+            | InstKind::Literal { .. }
+            | InstKind::PushArg { .. }
+            | InstKind::CallBuiltin { .. } => false,
+        }
+    }
+    pub fn is_middle(&self) -> bool {
+        !self.is_tail()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -125,6 +143,9 @@ pub mod testing {
                 branch_then,
                 branch_else,
             })
+        }
+        pub fn return_() -> Inst {
+            Inst::new(InstKind::Return)
         }
         pub fn copy(lhs: usize, rhs: usize) -> Inst {
             Inst::new(InstKind::Copy { lhs, rhs })
