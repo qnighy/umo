@@ -97,6 +97,11 @@ fn liveness_bb(
             InstKind::PushArg { value_ref } => {
                 alive.insert(*value_ref);
             }
+            InstKind::Call { lhs, .. } => {
+                if let Some(lhs) = lhs {
+                    alive.remove(*lhs);
+                }
+            }
             InstKind::CallBuiltin { lhs, .. } => {
                 if let Some(lhs) = lhs {
                     alive.remove(*lhs);
@@ -212,6 +217,7 @@ fn moved_rhs_of(inst: &Inst) -> Option<usize> {
         InstKind::Drop { rhs } => Some(*rhs),
         InstKind::Literal { .. } => None,
         InstKind::PushArg { value_ref } => Some(*value_ref),
+        InstKind::Call { .. } => None,
         InstKind::CallBuiltin { .. } => None,
     }
 }
@@ -239,6 +245,9 @@ fn replace_moved_rhs(inst: &mut Inst, to: usize) {
         InstKind::PushArg { value_ref } => {
             *value_ref = to;
         }
+        InstKind::Call { .. } => {
+            unreachable!();
+        }
         InstKind::CallBuiltin { .. } => {
             unreachable!();
         }
@@ -254,6 +263,7 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
         InstKind::Drop { .. } => None,
         InstKind::Literal { lhs, .. } => Some(*lhs),
         InstKind::PushArg { .. } => None,
+        InstKind::Call { lhs, .. } => *lhs,
         InstKind::CallBuiltin { lhs, .. } => *lhs,
     }
 }

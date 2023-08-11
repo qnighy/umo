@@ -11,9 +11,14 @@ struct State {
 }
 
 pub fn eval1(ctx: &dyn RtCtx, program_unit: &ProgramUnit) {
-    eval1_function(ctx, &program_unit.functions[0], vec![]);
+    eval1_function(ctx, program_unit, &program_unit.functions[0], vec![]);
 }
-fn eval1_function(ctx: &dyn RtCtx, function: &Function, received_args: Vec<Value>) -> Value {
+fn eval1_function(
+    ctx: &dyn RtCtx,
+    program_unit: &ProgramUnit,
+    function: &Function,
+    received_args: Vec<Value>,
+) -> Value {
     assert!(function.num_args <= function.num_vars);
     let mut state = State {
         vars: vec![None; function.num_vars],
@@ -25,7 +30,7 @@ fn eval1_function(ctx: &dyn RtCtx, function: &Function, received_args: Vec<Value
     let mut current_bb_id = 0;
     loop {
         let bb = &function.body[current_bb_id];
-        match eval1_bb(ctx, &mut state, bb) {
+        match eval1_bb(ctx, &mut state, program_unit, bb) {
             BlockResult::Return(value) => {
                 return value;
             }
@@ -40,7 +45,12 @@ enum BlockResult {
     Return(Value),
     Jump(usize),
 }
-fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> BlockResult {
+fn eval1_bb(
+    ctx: &dyn RtCtx,
+    state: &mut State,
+    program_unit: &ProgramUnit,
+    bb: &BasicBlock,
+) -> BlockResult {
     for inst in &bb.insts {
         match &inst.kind {
             InstKind::Jump { target } => {
@@ -74,6 +84,14 @@ fn eval1_bb(ctx: &dyn RtCtx, state: &mut State, bb: &BasicBlock) -> BlockResult 
             InstKind::PushArg { value_ref } => {
                 let value = state.vars[*value_ref].take().unwrap();
                 state.args.push(value);
+            }
+            InstKind::Call { lhs, callee } => {
+                let args = mem::replace(&mut state.args, vec![]);
+                let return_value =
+                    eval1_function(ctx, program_unit, &program_unit.functions[*callee], args);
+                if let Some(lhs) = lhs {
+                    state.vars[*lhs] = Some(return_value);
+                }
             }
             InstKind::CallBuiltin { lhs, builtin: f } => {
                 let args = mem::replace(&mut state.args, vec![]);

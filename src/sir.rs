@@ -92,6 +92,11 @@ pub enum InstKind {
     PushArg {
         value_ref: usize,
     },
+    #[allow(unused)] // TODO: remove it later
+    Call {
+        lhs: Option<usize>,
+        callee: usize,
+    },
     CallBuiltin {
         lhs: Option<usize>,
         builtin: BuiltinKind,
@@ -106,6 +111,7 @@ impl InstKind {
             | InstKind::Drop { .. }
             | InstKind::Literal { .. }
             | InstKind::PushArg { .. }
+            | InstKind::Call { .. }
             | InstKind::CallBuiltin { .. } => false,
         }
     }
@@ -289,6 +295,12 @@ pub mod testing {
         }
         pub fn push_arg(value_ref: usize) -> Inst {
             Inst::new(InstKind::PushArg { value_ref })
+        }
+        pub fn call(lhs: usize, function: usize) -> Inst {
+            Inst::new(InstKind::Call {
+                lhs: Some(lhs),
+                callee: function,
+            })
         }
         pub fn add(lhs: usize) -> Inst {
             Inst::new(InstKind::CallBuiltin {

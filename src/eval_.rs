@@ -241,4 +241,98 @@ mod tests {
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "45\n");
     }
+
+    #[test]
+    fn test_fib() {
+        // let fib = fn(n) {
+        //     if n < 2 {
+        //         n
+        //     } else {
+        //         fib(n - 1) + fib(n - 2)
+        //     }
+        // };
+        // puti(fib(10));
+
+        let ctx = MockRtCtx::new();
+        eval(
+            &ctx,
+            &ProgramUnit::describe(|p, (entry, fib)| {
+                p.function(
+                    entry,
+                    Function::simple(0, |(tmp1, tmp2, tmp3)| {
+                        vec![
+                            // tmp1 = 10;
+                            insts::integer_literal(tmp1, 10),
+                            // tmp2 = fib(tmp1);
+                            insts::push_arg(tmp1),
+                            insts::call(tmp2, fib),
+                            // puti(tmp2);
+                            insts::push_arg(tmp2),
+                            insts::puti(),
+                            // return;
+                            insts::unit_literal(tmp3),
+                            insts::return_(tmp3),
+                        ]
+                    }),
+                );
+                p.function(
+                    fib,
+                    Function::describe(
+                        1,
+                        |desc,
+                         (n, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8, tmp9),
+                         (entry, branch_then, branch_else)| {
+                            desc.block(
+                                entry,
+                                vec![
+                                    // tmp1 = n < 2;
+                                    insts::integer_literal(tmp2, 2),
+                                    insts::push_arg(n),
+                                    insts::push_arg(tmp2),
+                                    insts::lt(tmp1),
+                                    // if tmp1 { goto branch_then; } else { goto branch_else; };
+                                    insts::branch(tmp1, branch_then, branch_else),
+                                ],
+                            );
+                            desc.block(
+                                branch_then,
+                                vec![
+                                    // return n;
+                                    insts::return_(n),
+                                ],
+                            );
+                            desc.block(
+                                branch_else,
+                                vec![
+                                    // tmp4 = n - 1;
+                                    insts::integer_literal(tmp5, -1),
+                                    insts::push_arg(n),
+                                    insts::push_arg(tmp5),
+                                    insts::add(tmp4),
+                                    // tmp6 = fib(tmp4);
+                                    insts::push_arg(tmp4),
+                                    insts::call(tmp6, fib),
+                                    // tmp7 = n - 2;
+                                    insts::integer_literal(tmp8, -2),
+                                    insts::push_arg(n),
+                                    insts::push_arg(tmp8),
+                                    insts::add(tmp7),
+                                    // tmp9 = fib(tmp7);
+                                    insts::push_arg(tmp7),
+                                    insts::call(tmp9, fib),
+                                    // tmp3 = tmp6 + tmp9;
+                                    insts::push_arg(tmp6),
+                                    insts::push_arg(tmp9),
+                                    insts::add(tmp3),
+                                    // return tmp3;
+                                    insts::return_(tmp3),
+                                ],
+                            );
+                        },
+                    ),
+                );
+            }),
+        );
+        assert_eq!(ctx.stdout.lock().unwrap().as_str(), "55\n");
+    }
 }

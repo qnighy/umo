@@ -125,7 +125,7 @@ pub fn typecheck(cctx: &CCtx, program_unit: &ProgramUnit) -> Result<(), TypeErro
 fn typecheck_function(
     cctx: &CCtx,
     ty_ctx: &mut TyCtx,
-    _pctx: &PTyCtx,
+    pctx: &PTyCtx,
     function: &Function,
     function_type: &FunctionType,
 ) -> Result<(), TypeError> {
@@ -136,7 +136,15 @@ fn typecheck_function(
         ty_ctx.unify(arg_var_type, arg_type)?;
     }
     for bb in &function.body {
-        typecheck_bb(cctx, ty_ctx, &mut state, function, bb, &function_type.ret)?;
+        typecheck_bb(
+            cctx,
+            ty_ctx,
+            pctx,
+            &mut state,
+            function,
+            bb,
+            &function_type.ret,
+        )?;
     }
     // for ty in &state.vars {
     //     if ty_ctx.has_any_ty_var(ty) {
@@ -149,6 +157,7 @@ fn typecheck_function(
 fn typecheck_bb(
     cctx: &CCtx,
     ty_ctx: &mut TyCtx,
+    pctx: &PTyCtx,
     state: &mut State,
     function: &Function,
     bb: &BasicBlock,
@@ -187,6 +196,18 @@ fn typecheck_bb(
             }
             InstKind::PushArg { value_ref } => {
                 args.push(state.vars[*value_ref].clone());
+            }
+            InstKind::Call { lhs, callee } => {
+                let args = std::mem::replace(&mut args, vec![]);
+                if args.len() != pctx.functions[*callee].args.len() {
+                    return Err(TypeError);
+                }
+                for (arg_type, param_type) in args.iter().zip(&pctx.functions[*callee].args) {
+                    ty_ctx.unify(arg_type, param_type)?;
+                }
+                if let Some(lhs) = lhs {
+                    ty_ctx.unify(&state.vars[*lhs], &pctx.functions[*callee].ret)?;
+                }
             }
             InstKind::CallBuiltin { lhs, builtin: f } => {
                 let args = std::mem::replace(&mut args, vec![]);
