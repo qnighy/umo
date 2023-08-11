@@ -70,6 +70,7 @@ impl TyCtx {
             Type::Bool => false,
         }
     }
+    #[allow(unused)] // TODO: remove it later
     fn has_any_ty_var(&self, ty: &Type) -> bool {
         match ty {
             Type::Var { var_id } => {
@@ -88,30 +89,60 @@ impl TyCtx {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct PTyCtx {
+    functions: Vec<FunctionType>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct FunctionType {
+    args: Vec<Type>,
+    ret: Type,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct State {
     vars: Vec<Type>,
 }
 
 pub fn typecheck(cctx: &CCtx, program_unit: &ProgramUnit) -> Result<(), TypeError> {
-    for function in &program_unit.functions {
-        typecheck_function(cctx, function)?;
+    let mut ty_ctx = TyCtx { ty_vars: vec![] };
+    let pctx = PTyCtx {
+        functions: program_unit
+            .functions
+            .iter()
+            .map(|function| FunctionType {
+                args: (0..function.num_args).map(|_| ty_ctx.fresh()).collect(),
+                ret: ty_ctx.fresh(),
+            })
+            .collect(),
+    };
+    for (function, function_type) in program_unit.functions.iter().zip(&pctx.functions) {
+        typecheck_function(cctx, &mut ty_ctx, &pctx, function, function_type)?;
     }
     Ok(())
 }
 
-fn typecheck_function(cctx: &CCtx, function: &Function) -> Result<(), TypeError> {
-    let mut ty_ctx = TyCtx { ty_vars: vec![] };
+fn typecheck_function(
+    cctx: &CCtx,
+    ty_ctx: &mut TyCtx,
+    _pctx: &PTyCtx,
+    function: &Function,
+    function_type: &FunctionType,
+) -> Result<(), TypeError> {
     let mut state = State {
         vars: (0..function.num_vars).map(|_| ty_ctx.fresh()).collect(),
     };
+    for (arg_var_type, arg_type) in state.vars.iter().zip(&function_type.args) {
+        ty_ctx.unify(arg_var_type, arg_type)?;
+    }
     for bb in &function.body {
-        typecheck_bb(cctx, &mut ty_ctx, &mut state, function, bb)?;
+        typecheck_bb(cctx, ty_ctx, &mut state, function, bb, &function_type.ret)?;
     }
-    for ty in &state.vars {
-        if ty_ctx.has_any_ty_var(ty) {
-            return Err(TypeError);
-        }
-    }
+    // for ty in &state.vars {
+    //     if ty_ctx.has_any_ty_var(ty) {
+    //         return Err(TypeError);
+    //     }
+    // }
     // TODO: also check liveness
     Ok(())
 }
@@ -121,6 +152,7 @@ fn typecheck_bb(
     state: &mut State,
     function: &Function,
     bb: &BasicBlock,
+    return_type: &Type,
 ) -> Result<(), TypeError> {
     let mut args = vec![];
     for inst in &bb.insts {
@@ -144,8 +176,7 @@ fn typecheck_bb(
                 ty_ctx.unify(&state.vars[*cond], &Type::Bool)?;
             }
             InstKind::Return { rhs } => {
-                // TODO: use return type
-                ty_ctx.unify(&state.vars[*rhs], &Type::Unit)?;
+                ty_ctx.unify(&state.vars[*rhs], return_type)?;
             }
             InstKind::Copy { lhs, rhs } => {
                 ty_ctx.unify(&state.vars[*lhs], &state.vars[*rhs])?;
