@@ -180,8 +180,8 @@ fn insert_copy_bb(
     }
 }
 
-fn moved_rhs_of(bb: &Inst) -> Option<usize> {
-    match &bb.kind {
+fn moved_rhs_of(inst: &Inst) -> Option<usize> {
+    match &inst.kind {
         InstKind::Jump { .. } => None,
         InstKind::Branch { cond, .. } => Some(*cond),
         InstKind::Return => None,
@@ -193,8 +193,8 @@ fn moved_rhs_of(bb: &Inst) -> Option<usize> {
     }
 }
 
-fn replace_moved_rhs(bb: &mut Inst, to: usize) {
-    match &mut bb.kind {
+fn replace_moved_rhs(inst: &mut Inst, to: usize) {
+    match &mut inst.kind {
         InstKind::Jump { .. } => {
             unreachable!();
         }
