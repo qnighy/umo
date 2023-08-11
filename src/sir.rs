@@ -5,6 +5,17 @@ use std::sync::Arc;
 use crate::cctx::Id;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ProgramUnit {
+    pub functions: Vec<Function>,
+}
+
+impl ProgramUnit {
+    pub fn new(functions: Vec<Function>) -> Self {
+        Self { functions }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Function {
     pub num_vars: usize,
     // pub num_args: usize,
@@ -115,8 +126,58 @@ pub enum BuiltinKind {
 
 #[cfg(test)]
 pub mod testing {
-    use crate::sir::{BasicBlock, Function, Inst};
+    use crate::sir::{BasicBlock, Function, Inst, ProgramUnit};
     use crate::testing::SeqGen;
+
+    pub trait ProgramUnitTestingExt {
+        fn describe<FS, F>(f: F) -> Self
+        where
+            FS: SeqGen,
+            F: FnOnce(&mut ProgramUnitDescriber, FS);
+
+        fn simple(function: Function) -> Self;
+    }
+
+    impl ProgramUnitTestingExt for ProgramUnit {
+        fn describe<FS, F>(f: F) -> Self
+        where
+            FS: SeqGen,
+            F: FnOnce(&mut ProgramUnitDescriber, FS),
+        {
+            let mut desc = ProgramUnitDescriber {
+                program_unit: ProgramUnit {
+                    functions: vec![
+                        Function {
+                            num_vars: 0,
+                            body: vec![]
+                        };
+                        FS::size()
+                    ],
+                },
+            };
+            f(&mut desc, FS::seq());
+            desc.program_unit
+        }
+
+        fn simple(function: Function) -> Self {
+            Self {
+                functions: vec![function],
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct ProgramUnitDescriber {
+        program_unit: ProgramUnit,
+    }
+
+    impl ProgramUnitDescriber {
+        #[allow(unused)] // TODO: remove it later
+        pub fn function(&mut self, function_id: usize, function: Function) -> &mut Self {
+            self.program_unit.functions[function_id] = function;
+            self
+        }
+    }
 
     pub trait FunctionTestingExt {
         fn describe<VS, BS, F>(f: F) -> Self

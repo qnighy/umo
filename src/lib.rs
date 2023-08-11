@@ -17,7 +17,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
     if source == "use lang::\"0.0.1\";\nputs(\"Hello, world!\");\n" {
         eval_::eval(
             ctx,
-            &sir::Function::new(
+            &sir::ProgramUnit::new(vec![sir::Function::new(
                 1,
                 vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
@@ -31,12 +31,12 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                     }),
                     sir::Inst::new(sir::InstKind::Return),
                 ])],
-            ),
+            )]),
         );
     } else if source == "use lang::\"0.0.1\";\nputi(1 + 1);\n" {
         eval_::eval(
             ctx,
-            &sir::Function::new(
+            &sir::ProgramUnit::new(vec![sir::Function::new(
                 3,
                 vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
@@ -60,7 +60,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                     }),
                     sir::Inst::new(sir::InstKind::Return),
                 ])],
-            ),
+            )]),
         );
     } else {
         todo!("Proper parsing and execution");

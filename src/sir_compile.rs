@@ -4,9 +4,17 @@ use std::mem;
 use bit_set::BitSet;
 
 use crate::cctx::{CCtx, Id};
-use crate::sir::{BasicBlock, Function, Inst, InstKind};
+use crate::sir::{BasicBlock, Function, Inst, InstKind, ProgramUnit};
 
-pub fn compile(cctx: &CCtx, function: &Function) -> Function {
+pub fn compile(cctx: &CCtx, program_unit: &ProgramUnit) -> ProgramUnit {
+    let mut program_unit = program_unit.clone();
+    for function in &mut program_unit.functions {
+        *function = compile_function(cctx, function);
+    }
+    program_unit
+}
+
+fn compile_function(cctx: &CCtx, function: &Function) -> Function {
     let mut function = function.clone();
     assign_id(cctx, &mut function);
     let live_in = liveness(cctx, &function);
@@ -237,14 +245,14 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::sir::testing::{insts, FunctionTestingExt};
+    use crate::sir::testing::{insts, FunctionTestingExt, ProgramUnitTestingExt};
 
     use super::*;
 
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|desc, (x,), (entry,)| {
+        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
             desc.block(
                 entry,
                 vec![
@@ -259,11 +267,11 @@ mod tests {
                     insts::return_(),
                 ],
             );
-        });
-        let bb = compile(&cctx, &bb);
+        }));
+        let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
-            bb,
-            Function::describe(|desc, (x, tmp1), (entry,)| {
+            program_unit,
+            ProgramUnit::simple(Function::describe(|desc, (x, tmp1), (entry,)| {
                 desc.block(
                     entry,
                     vec![
@@ -279,14 +287,14 @@ mod tests {
                         insts::return_(),
                     ],
                 );
-            })
+            }))
         );
     }
 
     #[test]
     fn test_compile_drop() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|desc, (x,), (entry,)| {
+        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
             desc.block(
                 entry,
                 vec![
@@ -297,11 +305,11 @@ mod tests {
                     insts::return_(),
                 ],
             );
-        });
-        let bb = compile(&cctx, &bb);
+        }));
+        let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
-            bb,
-            Function::describe(|desc, (x,), (entry,)| {
+            program_unit,
+            ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
                 desc.block(
                     entry,
                     vec![
@@ -313,7 +321,7 @@ mod tests {
                         insts::return_(),
                     ],
                 );
-            })
+            }))
         );
     }
 }

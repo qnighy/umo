@@ -1,5 +1,5 @@
 use crate::cctx::CCtx;
-use crate::sir::{BasicBlock, BuiltinKind, Function, InstKind, Literal};
+use crate::sir::{BasicBlock, BuiltinKind, Function, InstKind, Literal, ProgramUnit};
 
 #[derive(Debug)]
 pub struct TypeError;
@@ -89,7 +89,14 @@ struct State {
     vars: Vec<Type>,
 }
 
-pub fn typecheck(cctx: &CCtx, function: &Function) -> Result<(), TypeError> {
+pub fn typecheck(cctx: &CCtx, program_unit: &ProgramUnit) -> Result<(), TypeError> {
+    for function in &program_unit.functions {
+        typecheck_function(cctx, function)?;
+    }
+    Ok(())
+}
+
+fn typecheck_function(cctx: &CCtx, function: &Function) -> Result<(), TypeError> {
     let mut ty_ctx = TyCtx { ty_vars: vec![] };
     let mut state = State {
         vars: (0..function.num_vars).map(|_| ty_ctx.fresh()).collect(),
@@ -220,13 +227,13 @@ impl Type {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sir::testing::{insts, FunctionTestingExt};
+    use crate::sir::testing::{insts, FunctionTestingExt, ProgramUnitTestingExt};
     use crate::sir::Function;
 
     #[test]
     fn test_typecheck_success() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|desc, (x,), (entry,)| {
+        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
             desc.block(
                 entry,
                 vec![
@@ -236,23 +243,25 @@ mod tests {
                     insts::return_(),
                 ],
             );
-        });
-        assert!(typecheck(&cctx, &bb).is_ok());
+        }));
+        assert!(typecheck(&cctx, &program_unit).is_ok());
     }
 
     #[test]
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|desc, (), (entry,)| {
-            desc.block(entry, vec![insts::puti(), insts::return_()]);
+        let program_unit = ProgramUnit::simple({
+            Function::describe(|desc, (), (entry,)| {
+                desc.block(entry, vec![insts::puti(), insts::return_()]);
+            })
         });
-        assert!(typecheck(&cctx, &bb).is_err());
+        assert!(typecheck(&cctx, &program_unit).is_err());
     }
 
     #[test]
     fn test_typecheck_failure_too_many_arg() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|desc, (x,), (entry,)| {
+        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
             desc.block(
                 entry,
                 vec![
@@ -263,14 +272,14 @@ mod tests {
                     insts::return_(),
                 ],
             );
-        });
-        assert!(typecheck(&cctx, &bb).is_err());
+        }));
+        assert!(typecheck(&cctx, &program_unit).is_err());
     }
 
     #[test]
     fn test_typecheck_failure_arg_type_mismatch() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|desc, (x,), (entry,)| {
+        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
             desc.block(
                 entry,
                 vec![
@@ -280,14 +289,14 @@ mod tests {
                     insts::return_(),
                 ],
             );
-        });
-        assert!(typecheck(&cctx, &bb).is_err());
+        }));
+        assert!(typecheck(&cctx, &program_unit).is_err());
     }
 
     #[test]
     fn test_typecheck_failure_runaway_arg() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|desc, (x,), (entry,)| {
+        let program_unit = ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
             desc.block(
                 entry,
                 vec![
@@ -296,7 +305,7 @@ mod tests {
                     insts::return_(),
                 ],
             );
-        });
-        assert!(typecheck(&cctx, &bb).is_err());
+        }));
+        assert!(typecheck(&cctx, &program_unit).is_err());
     }
 }

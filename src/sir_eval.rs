@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::Arc;
 
 use crate::rt_ctx::RtCtx;
-use crate::sir::{BasicBlock, BuiltinKind, Function, InstKind, Literal};
+use crate::sir::{BasicBlock, BuiltinKind, Function, InstKind, Literal, ProgramUnit};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct State {
@@ -10,7 +10,10 @@ struct State {
     args: Vec<Value>,
 }
 
-pub fn eval1(ctx: &dyn RtCtx, function: &Function) {
+pub fn eval1(ctx: &dyn RtCtx, program_unit: &ProgramUnit) {
+    eval1_function(ctx, &program_unit.functions[0]);
+}
+fn eval1_function(ctx: &dyn RtCtx, function: &Function) {
     let mut state = State {
         vars: vec![None; function.num_vars],
         args: vec![],

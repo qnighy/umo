@@ -1,22 +1,23 @@
 use crate::cctx::CCtx;
 use crate::rt_ctx::RtCtx;
-use crate::sir::Function;
+use crate::sir::ProgramUnit;
 use crate::sir_compile::compile;
 use crate::sir_eval::eval1;
 use crate::sir_typecheck::typecheck;
 
-pub fn eval(ctx: &dyn RtCtx, bb: &Function) {
+pub fn eval(ctx: &dyn RtCtx, program_unit: &ProgramUnit) {
     let cctx = CCtx::new();
-    typecheck(&cctx, bb).unwrap();
-    let bb = compile(&cctx, bb);
-    eval1(ctx, &bb)
+    typecheck(&cctx, program_unit).unwrap();
+    let program_unit = compile(&cctx, program_unit);
+    eval1(ctx, &program_unit)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::sir::testing::{insts, FunctionTestingExt};
+    use crate::sir::testing::{insts, FunctionTestingExt, ProgramUnitTestingExt};
+    use crate::sir::Function;
     use crate::testing::MockRtCtx;
 
     #[test]
@@ -24,7 +25,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|desc, (x,), (entry,)| {
+            &ProgramUnit::simple(Function::describe(|desc, (x,), (entry,)| {
                 desc.block(
                     entry,
                     vec![
@@ -34,7 +35,7 @@ mod tests {
                         insts::return_(),
                     ],
                 );
-            }),
+            })),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
     }
@@ -44,7 +45,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|desc, (x,), (entry, label1)| {
+            &ProgramUnit::simple(Function::describe(|desc, (x,), (entry, label1)| {
                 desc.block(
                     entry,
                     vec![
@@ -56,7 +57,7 @@ mod tests {
                     label1,
                     vec![insts::push_arg(x), insts::puts(), insts::return_()],
                 );
-            }),
+            })),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
     }
@@ -66,7 +67,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|desc, (tmp1, tmp2, x), (entry,)| {
+            &ProgramUnit::simple(Function::describe(|desc, (tmp1, tmp2, x), (entry,)| {
                 desc.block(
                     entry,
                     vec![
@@ -80,7 +81,7 @@ mod tests {
                         insts::return_(),
                     ],
                 );
-            }),
+            })),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "2\n");
     }
@@ -90,33 +91,35 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|desc, (x, s), (entry, branch_then, branch_else)| {
-                desc.block(
-                    entry,
-                    vec![
-                        insts::bool_literal(x, true),
-                        insts::branch(x, branch_then, branch_else),
-                    ],
-                );
-                desc.block(
-                    branch_then,
-                    vec![
-                        insts::string_literal(s, "x is true"),
-                        insts::push_arg(s),
-                        insts::puts(),
-                        insts::return_(),
-                    ],
-                );
-                desc.block(
-                    branch_else,
-                    vec![
-                        insts::string_literal(s, "x is false"),
-                        insts::push_arg(s),
-                        insts::puts(),
-                        insts::return_(),
-                    ],
-                );
-            }),
+            &ProgramUnit::simple(Function::describe(
+                |desc, (x, s), (entry, branch_then, branch_else)| {
+                    desc.block(
+                        entry,
+                        vec![
+                            insts::bool_literal(x, true),
+                            insts::branch(x, branch_then, branch_else),
+                        ],
+                    );
+                    desc.block(
+                        branch_then,
+                        vec![
+                            insts::string_literal(s, "x is true"),
+                            insts::push_arg(s),
+                            insts::puts(),
+                            insts::return_(),
+                        ],
+                    );
+                    desc.block(
+                        branch_else,
+                        vec![
+                            insts::string_literal(s, "x is false"),
+                            insts::push_arg(s),
+                            insts::puts(),
+                            insts::return_(),
+                        ],
+                    );
+                },
+            )),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "x is true\n");
     }
@@ -126,33 +129,35 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|desc, (x, s), (entry, branch_then, branch_else)| {
-                desc.block(
-                    entry,
-                    vec![
-                        insts::bool_literal(x, false),
-                        insts::branch(x, branch_then, branch_else),
-                    ],
-                );
-                desc.block(
-                    branch_then,
-                    vec![
-                        insts::string_literal(s, "x is true"),
-                        insts::push_arg(s),
-                        insts::puts(),
-                        insts::return_(),
-                    ],
-                );
-                desc.block(
-                    branch_else,
-                    vec![
-                        insts::string_literal(s, "x is false"),
-                        insts::push_arg(s),
-                        insts::puts(),
-                        insts::return_(),
-                    ],
-                );
-            }),
+            &ProgramUnit::simple(Function::describe(
+                |desc, (x, s), (entry, branch_then, branch_else)| {
+                    desc.block(
+                        entry,
+                        vec![
+                            insts::bool_literal(x, false),
+                            insts::branch(x, branch_then, branch_else),
+                        ],
+                    );
+                    desc.block(
+                        branch_then,
+                        vec![
+                            insts::string_literal(s, "x is true"),
+                            insts::push_arg(s),
+                            insts::puts(),
+                            insts::return_(),
+                        ],
+                    );
+                    desc.block(
+                        branch_else,
+                        vec![
+                            insts::string_literal(s, "x is false"),
+                            insts::push_arg(s),
+                            insts::puts(),
+                            insts::return_(),
+                        ],
+                    );
+                },
+            )),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "x is false\n");
     }
@@ -170,7 +175,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(
+            &ProgramUnit::simple(Function::describe(
                 |desc, (sum, i, tmp1, tmp2, tmp3), (entry, cond, body, end)| {
                     desc.block(
                         entry,
@@ -223,7 +228,7 @@ mod tests {
                         ],
                     );
                 },
-            ),
+            )),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "45\n");
     }
