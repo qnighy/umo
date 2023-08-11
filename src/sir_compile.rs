@@ -244,27 +244,12 @@ mod tests {
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|(x,)| {
-            vec![BasicBlock::new(vec![
-                insts::string_literal(x, "Hello, world!"),
-                insts::push_arg(x),
-                insts::puts(),
-                insts::push_arg(x),
-                insts::puts(),
-                insts::string_literal(x, "Hello, world!"),
-                insts::push_arg(x),
-                insts::puts(),
-                insts::return_(),
-            ])]
-        });
-        let bb = compile(&cctx, &bb);
-        assert_eq!(
-            bb,
-            Function::describe(|(x, tmp1)| {
-                vec![BasicBlock::new(vec![
+        let bb = Function::describe(|desc, (x,), (entry,)| {
+            desc.block(
+                entry,
+                vec![
                     insts::string_literal(x, "Hello, world!"),
-                    insts::copy(tmp1, x),
-                    insts::push_arg(tmp1),
+                    insts::push_arg(x),
                     insts::puts(),
                     insts::push_arg(x),
                     insts::puts(),
@@ -272,7 +257,28 @@ mod tests {
                     insts::push_arg(x),
                     insts::puts(),
                     insts::return_(),
-                ])]
+                ],
+            );
+        });
+        let bb = compile(&cctx, &bb);
+        assert_eq!(
+            bb,
+            Function::describe(|desc, (x, tmp1), (entry,)| {
+                desc.block(
+                    entry,
+                    vec![
+                        insts::string_literal(x, "Hello, world!"),
+                        insts::copy(tmp1, x),
+                        insts::push_arg(tmp1),
+                        insts::puts(),
+                        insts::push_arg(x),
+                        insts::puts(),
+                        insts::string_literal(x, "Hello, world!"),
+                        insts::push_arg(x),
+                        insts::puts(),
+                        insts::return_(),
+                    ],
+                );
             })
         );
     }
@@ -280,27 +286,33 @@ mod tests {
     #[test]
     fn test_compile_drop() {
         let cctx = CCtx::new();
-        let bb = Function::describe(|(x,)| {
-            vec![BasicBlock::new(vec![
-                insts::string_literal(x, "dummy"),
-                insts::string_literal(x, "Hello, world!"),
-                insts::push_arg(x),
-                insts::puts(),
-                insts::return_(),
-            ])]
-        });
-        let bb = compile(&cctx, &bb);
-        assert_eq!(
-            bb,
-            Function::describe(|(x,)| {
-                vec![BasicBlock::new(vec![
+        let bb = Function::describe(|desc, (x,), (entry,)| {
+            desc.block(
+                entry,
+                vec![
                     insts::string_literal(x, "dummy"),
-                    insts::drop(x),
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
                     insts::puts(),
                     insts::return_(),
-                ])]
+                ],
+            );
+        });
+        let bb = compile(&cctx, &bb);
+        assert_eq!(
+            bb,
+            Function::describe(|desc, (x,), (entry,)| {
+                desc.block(
+                    entry,
+                    vec![
+                        insts::string_literal(x, "dummy"),
+                        insts::drop(x),
+                        insts::string_literal(x, "Hello, world!"),
+                        insts::push_arg(x),
+                        insts::puts(),
+                        insts::return_(),
+                    ],
+                );
             })
         );
     }

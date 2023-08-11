@@ -17,7 +17,6 @@ mod tests {
     use super::*;
 
     use crate::sir::testing::{insts, FunctionTestingExt};
-    use crate::sir::BasicBlock;
     use crate::testing::MockRtCtx;
 
     #[test]
@@ -25,13 +24,16 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|(x,)| {
-                vec![BasicBlock::new(vec![
-                    insts::string_literal(x, "Hello, world!"),
-                    insts::push_arg(x),
-                    insts::puts(),
-                    insts::return_(),
-                ])]
+            &Function::describe(|desc, (x,), (entry,)| {
+                desc.block(
+                    entry,
+                    vec![
+                        insts::string_literal(x, "Hello, world!"),
+                        insts::push_arg(x),
+                        insts::puts(),
+                        insts::return_(),
+                    ],
+                );
             }),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
@@ -42,14 +44,18 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|(x,)| {
-                vec![
-                    BasicBlock::new(vec![
+            &Function::describe(|desc, (x,), (entry, label1)| {
+                desc.block(
+                    entry,
+                    vec![
                         insts::string_literal(x, "Hello, world!"),
-                        insts::jump(1),
-                    ]),
-                    BasicBlock::new(vec![insts::push_arg(x), insts::puts(), insts::return_()]),
-                ]
+                        insts::jump(label1),
+                    ],
+                );
+                desc.block(
+                    label1,
+                    vec![insts::push_arg(x), insts::puts(), insts::return_()],
+                );
             }),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
@@ -60,17 +66,20 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|(tmp1, tmp2, x)| {
-                vec![BasicBlock::new(vec![
-                    insts::integer_literal(tmp1, 1),
-                    insts::integer_literal(tmp2, 1),
-                    insts::push_arg(tmp1),
-                    insts::push_arg(tmp2),
-                    insts::add(x),
-                    insts::push_arg(x),
-                    insts::puti(),
-                    insts::return_(),
-                ])]
+            &Function::describe(|desc, (tmp1, tmp2, x), (entry,)| {
+                desc.block(
+                    entry,
+                    vec![
+                        insts::integer_literal(tmp1, 1),
+                        insts::integer_literal(tmp2, 1),
+                        insts::push_arg(tmp1),
+                        insts::push_arg(tmp2),
+                        insts::add(x),
+                        insts::push_arg(x),
+                        insts::puti(),
+                        insts::return_(),
+                    ],
+                );
             }),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "2\n");
@@ -81,22 +90,32 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|(x, s)| {
-                vec![
-                    BasicBlock::new(vec![insts::bool_literal(x, true), insts::branch(x, 1, 2)]),
-                    BasicBlock::new(vec![
+            &Function::describe(|desc, (x, s), (entry, branch_then, branch_else)| {
+                desc.block(
+                    entry,
+                    vec![
+                        insts::bool_literal(x, true),
+                        insts::branch(x, branch_then, branch_else),
+                    ],
+                );
+                desc.block(
+                    branch_then,
+                    vec![
                         insts::string_literal(s, "x is true"),
                         insts::push_arg(s),
                         insts::puts(),
                         insts::return_(),
-                    ]),
-                    BasicBlock::new(vec![
+                    ],
+                );
+                desc.block(
+                    branch_else,
+                    vec![
                         insts::string_literal(s, "x is false"),
                         insts::push_arg(s),
                         insts::puts(),
                         insts::return_(),
-                    ]),
-                ]
+                    ],
+                );
             }),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "x is true\n");
@@ -107,22 +126,32 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|(x, s)| {
-                vec![
-                    BasicBlock::new(vec![insts::bool_literal(x, false), insts::branch(x, 1, 2)]),
-                    BasicBlock::new(vec![
+            &Function::describe(|desc, (x, s), (entry, branch_then, branch_else)| {
+                desc.block(
+                    entry,
+                    vec![
+                        insts::bool_literal(x, false),
+                        insts::branch(x, branch_then, branch_else),
+                    ],
+                );
+                desc.block(
+                    branch_then,
+                    vec![
                         insts::string_literal(s, "x is true"),
                         insts::push_arg(s),
                         insts::puts(),
                         insts::return_(),
-                    ]),
-                    BasicBlock::new(vec![
+                    ],
+                );
+                desc.block(
+                    branch_else,
+                    vec![
                         insts::string_literal(s, "x is false"),
                         insts::push_arg(s),
                         insts::puts(),
                         insts::return_(),
-                    ]),
-                ]
+                    ],
+                );
             }),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "x is false\n");
@@ -141,52 +170,60 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &Function::describe(|(sum, i, tmp1, tmp2, tmp3)| {
-                vec![
-                    // start:
-                    BasicBlock::new(vec![
-                        // let mut sum = 0;
-                        insts::integer_literal(sum, 0),
-                        // let mut i = 0;
-                        insts::integer_literal(i, 0),
-                        // goto cond;
-                        insts::jump(1),
-                    ]),
-                    // cond:
-                    BasicBlock::new(vec![
-                        // tmp1 = 10;
-                        insts::integer_literal(tmp1, 10),
-                        // tmp2 = i < tmp1;
-                        insts::push_arg(i),
-                        insts::push_arg(tmp1),
-                        insts::lt(tmp2),
-                        // if tmp2 { goto body; } else { goto end; };
-                        insts::branch(tmp2, 2, 3),
-                    ]),
-                    // body:
-                    BasicBlock::new(vec![
-                        // sum = sum + i;
-                        insts::push_arg(sum),
-                        insts::push_arg(i),
-                        insts::add(sum),
-                        // i = i + 1;
-                        insts::integer_literal(tmp3, 1),
-                        insts::push_arg(i),
-                        insts::push_arg(tmp3),
-                        insts::add(i),
-                        // goto cond;
-                        insts::jump(1),
-                    ]),
-                    // end:
-                    BasicBlock::new(vec![
-                        // puti(sum);
-                        insts::push_arg(sum),
-                        insts::puti(),
-                        // return;
-                        insts::return_(),
-                    ]),
-                ]
-            }),
+            &Function::describe(
+                |desc, (sum, i, tmp1, tmp2, tmp3), (entry, cond, body, end)| {
+                    desc.block(
+                        entry,
+                        vec![
+                            // let mut sum = 0;
+                            insts::integer_literal(sum, 0),
+                            // let mut i = 0;
+                            insts::integer_literal(i, 0),
+                            // goto cond;
+                            insts::jump(1),
+                        ],
+                    );
+                    desc.block(
+                        cond,
+                        vec![
+                            // tmp1 = 10;
+                            insts::integer_literal(tmp1, 10),
+                            // tmp2 = i < tmp1;
+                            insts::push_arg(i),
+                            insts::push_arg(tmp1),
+                            insts::lt(tmp2),
+                            // if tmp2 { goto body; } else { goto end; };
+                            insts::branch(tmp2, body, end),
+                        ],
+                    );
+                    desc.block(
+                        body,
+                        vec![
+                            // sum = sum + i;
+                            insts::push_arg(sum),
+                            insts::push_arg(i),
+                            insts::add(sum),
+                            // i = i + 1;
+                            insts::integer_literal(tmp3, 1),
+                            insts::push_arg(i),
+                            insts::push_arg(tmp3),
+                            insts::add(i),
+                            // goto cond;
+                            insts::jump(cond),
+                        ],
+                    );
+                    desc.block(
+                        end,
+                        vec![
+                            // puti(sum);
+                            insts::push_arg(sum),
+                            insts::puti(),
+                            // return;
+                            insts::return_(),
+                        ],
+                    );
+                },
+            ),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "45\n");
     }

@@ -24,6 +24,7 @@ pub struct BasicBlock {
 
 impl BasicBlock {
     pub fn new(insts: Vec<Inst>) -> Self {
+        assert!(insts.len() > 0);
         assert!(insts[..insts.len() - 1].iter().all(|i| i.kind.is_middle()));
         assert!(insts.last().unwrap().kind.is_tail());
         Self { insts }
@@ -114,24 +115,41 @@ pub enum BuiltinKind {
 
 #[cfg(test)]
 pub mod testing {
-    use crate::sir::{BasicBlock, Function};
+    use crate::sir::{BasicBlock, Function, Inst};
     use crate::testing::SeqGen;
 
     pub trait FunctionTestingExt {
-        fn describe<T, F>(f: F) -> Self
+        fn describe<VS, BS, F>(f: F) -> Self
         where
-            T: SeqGen,
-            F: FnOnce(T) -> Vec<BasicBlock>;
+            VS: SeqGen,
+            BS: SeqGen,
+            F: FnOnce(&mut FunctionDescriber, VS, BS);
     }
 
     impl FunctionTestingExt for Function {
-        fn describe<T, F>(f: F) -> Self
+        fn describe<VS, BS, F>(f: F) -> Self
         where
-            T: SeqGen,
-            F: FnOnce(T) -> Vec<BasicBlock>,
+            VS: SeqGen,
+            BS: SeqGen,
+            F: FnOnce(&mut FunctionDescriber, VS, BS),
         {
-            let body = f(T::seq());
-            Self::new(T::size(), body)
+            let mut desc = FunctionDescriber {
+                function: Self::new(VS::size(), vec![BasicBlock { insts: vec![] }; BS::size()]),
+            };
+            f(&mut desc, VS::seq(), BS::seq());
+            desc.function
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct FunctionDescriber {
+        function: Function,
+    }
+
+    impl FunctionDescriber {
+        pub fn block(&mut self, bb_id: usize, insts: Vec<Inst>) -> &mut Self {
+            self.function.body[bb_id] = BasicBlock::new(insts);
+            self
         }
     }
 
