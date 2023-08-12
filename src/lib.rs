@@ -2,6 +2,8 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+mod ast;
+mod ast_lowering;
 mod cctx;
 mod eval_;
 pub mod old;
