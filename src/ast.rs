@@ -15,6 +15,12 @@ pub enum Expr {
     #[allow(unused)] // TODO: remove this annotation later
     Var { name: String, id: Id },
     #[allow(unused)] // TODO: remove this annotation later
+    Branch {
+        cond: Box<Expr>,
+        then: Box<Expr>,
+        else_: Box<Expr>,
+    },
+    #[allow(unused)] // TODO: remove this annotation later
     // TODO: use BigInt
     IntegerLiteral { value: i32 },
     #[allow(unused)] // TODO: remove this annotation later
@@ -80,6 +86,11 @@ fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
                 panic!("undefined variable: {}", name);
             }
         }
+        Expr::Branch { cond, then, else_ } => {
+            assign_id_expr(cctx, scope, cond);
+            assign_id_expr(cctx, scope, then);
+            assign_id_expr(cctx, scope, else_);
+        }
         Expr::IntegerLiteral { .. } => {}
         Expr::Add { lhs, rhs } => {
             assign_id_expr(cctx, scope, lhs);
@@ -123,6 +134,14 @@ pub mod testing {
             Expr::Var {
                 name: name.to_string(),
                 id: Id::dummy(),
+            }
+        }
+
+        pub fn branch(cond: Expr, then: Expr, else_: Expr) -> Expr {
+            Expr::Branch {
+                cond: Box::new(cond),
+                then: Box::new(then),
+                else_: Box::new(else_),
             }
         }
 

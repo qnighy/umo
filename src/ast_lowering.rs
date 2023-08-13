@@ -113,6 +113,39 @@ fn lower_expr(
                     rhs: var_id,
                 }));
         }
+        Expr::Branch { cond, then, else_ } => {
+            let cond_var = lower_expr2(cond, var_id_map, function, bb_id);
+
+            let branch_bb_id = *bb_id;
+
+            let then_bb_id = function.body.len();
+            function.body.push(sir::BasicBlock { insts: vec![] });
+            *bb_id = then_bb_id;
+            lower_expr(then, var_id_map, function, bb_id, result_var);
+
+            let else_bb_id = function.body.len();
+            function.body.push(sir::BasicBlock { insts: vec![] });
+            *bb_id = else_bb_id;
+            lower_expr(else_, var_id_map, function, bb_id, result_var);
+
+            let cont_bb_id = function.body.len();
+            function.body.push(sir::BasicBlock { insts: vec![] });
+            *bb_id = cont_bb_id;
+
+            function.body[branch_bb_id]
+                .insts
+                .push(sir::Inst::new(sir::InstKind::Branch {
+                    cond: cond_var,
+                    branch_then: then_bb_id,
+                    branch_else: else_bb_id,
+                }));
+            function.body[then_bb_id]
+                .insts
+                .push(sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }));
+            function.body[else_bb_id]
+                .insts
+                .push(sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }));
+        }
         Expr::IntegerLiteral { value } => {
             function.body[*bb_id]
                 .insts
@@ -176,6 +209,11 @@ fn collect_vars_expr(expr: &Expr, vars: &mut HashSet<Id>) {
         Expr::Var { name: _, id } => {
             debug_assert!(!id.is_dummy());
             vars.insert(*id);
+        }
+        Expr::Branch { cond, then, else_ } => {
+            collect_vars_expr(cond, vars);
+            collect_vars_expr(then, vars);
+            collect_vars_expr(else_, vars);
         }
         Expr::IntegerLiteral { value: _ } => {}
         Expr::Add { lhs, rhs } => {
@@ -251,6 +289,48 @@ mod tests {
                     ],
                 );
             })
+        );
+    }
+
+    #[test]
+    fn test_lower_branch() {
+        let mut cctx = CCtx::new();
+        let s = assign_id(
+            &mut cctx,
+            vec![
+                stmts::let_("x", exprs::integer_literal(42)),
+                stmts::then_expr(exprs::branch(
+                    exprs::var("x"),
+                    exprs::integer_literal(1),
+                    exprs::integer_literal(2),
+                )),
+            ],
+        );
+        let function = lower(&s);
+        assert_eq!(
+            function,
+            sir::Function::describe(
+                0,
+                |desc, (x, tmp1, tmp2), (entry, branch_then, branch_else, cont)| {
+                    desc.block(
+                        entry,
+                        vec![
+                            insts::integer_literal(x, 42),
+                            insts::copy(tmp2, x),
+                            insts::branch(tmp2, branch_then, branch_else),
+                        ],
+                    );
+                    desc.block(
+                        branch_then,
+                        vec![insts::integer_literal(tmp1, 1), insts::jump(cont)],
+                    );
+                    desc.block(
+                        branch_else,
+                        vec![insts::integer_literal(tmp1, 2), insts::jump(cont)],
+                    );
+                    desc.block(cont, vec![insts::return_(tmp1)]);
+                }
+            )
         );
     }
 }
