@@ -146,6 +146,49 @@ fn lower_expr(
                 .insts
                 .push(sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }));
         }
+        Expr::While { cond, body } => {
+            let prev_bb_id = *bb_id;
+
+            let cond_bb_id = function.body.len();
+            function.body.push(sir::BasicBlock { insts: vec![] });
+            *bb_id = cond_bb_id;
+            lower_expr(cond, var_id_map, function, bb_id, result_var);
+
+            let body_bb_id = function.body.len();
+            function.body.push(sir::BasicBlock { insts: vec![] });
+            *bb_id = body_bb_id;
+            lower_expr(body, var_id_map, function, bb_id, result_var);
+
+            let cont_bb_id = function.body.len();
+            function.body.push(sir::BasicBlock { insts: vec![] });
+            *bb_id = cont_bb_id;
+
+            function.body[prev_bb_id]
+                .insts
+                .push(sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }));
+            function.body[cond_bb_id]
+                .insts
+                .push(sir::Inst::new(sir::InstKind::Branch {
+                    cond: result_var,
+                    branch_then: body_bb_id,
+                    branch_else: cont_bb_id,
+                }));
+            function.body[body_bb_id]
+                .insts
+                .push(sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }));
+        }
+        Expr::Block { stmts } => lower_stmts(stmts, var_id_map, function, bb_id, result_var),
+        Expr::Assign { name: _, id, rhs } => {
+            debug_assert!(!id.is_dummy());
+            let var_id = var_id_map[id];
+            lower_expr(rhs, var_id_map, function, bb_id, var_id);
+            function.body[*bb_id]
+                .insts
+                .push(sir::Inst::new(sir::InstKind::Literal {
+                    lhs: result_var,
+                    value: sir::Literal::Unit,
+                }));
+        }
         Expr::IntegerLiteral { value } => {
             function.body[*bb_id]
                 .insts
@@ -168,6 +211,22 @@ fn lower_expr(
             bb.insts.push(sir::Inst::new(sir::InstKind::CallBuiltin {
                 lhs: Some(result_var),
                 builtin: sir::BuiltinKind::Add,
+            }));
+        }
+        Expr::Lt { lhs, rhs } => {
+            let lhs_var = lower_expr2(lhs, var_id_map, function, bb_id);
+            let rhs_var = lower_expr2(rhs, var_id_map, function, bb_id);
+
+            let bb = &mut function.body[*bb_id];
+            bb.insts.push(sir::Inst::new(sir::InstKind::PushArg {
+                value_ref: lhs_var,
+            }));
+            bb.insts.push(sir::Inst::new(sir::InstKind::PushArg {
+                value_ref: rhs_var,
+            }));
+            bb.insts.push(sir::Inst::new(sir::InstKind::CallBuiltin {
+                lhs: Some(result_var),
+                builtin: sir::BuiltinKind::Lt,
             }));
         }
     }
@@ -215,8 +274,22 @@ fn collect_vars_expr(expr: &Expr, vars: &mut HashSet<Id>) {
             collect_vars_expr(then, vars);
             collect_vars_expr(else_, vars);
         }
+        Expr::While { cond, body } => {
+            collect_vars_expr(cond, vars);
+            collect_vars_expr(body, vars);
+        }
+        Expr::Block { stmts } => collect_vars_stmts(stmts, vars),
+        Expr::Assign { name: _, id, rhs } => {
+            debug_assert!(!id.is_dummy());
+            vars.insert(*id);
+            collect_vars_expr(rhs, vars);
+        }
         Expr::IntegerLiteral { value: _ } => {}
         Expr::Add { lhs, rhs } => {
+            collect_vars_expr(lhs, vars);
+            collect_vars_expr(rhs, vars);
+        }
+        Expr::Lt { lhs, rhs } => {
             collect_vars_expr(lhs, vars);
             collect_vars_expr(rhs, vars);
         }
@@ -327,6 +400,61 @@ mod tests {
                     desc.block(
                         branch_else,
                         vec![insts::integer_literal(tmp1, 2), insts::jump(cont)],
+                    );
+                    desc.block(cont, vec![insts::return_(tmp1)]);
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn test_lower_loop() {
+        let mut cctx = CCtx::new();
+        let s = assign_id(
+            &mut cctx,
+            vec![
+                stmts::let_("x", exprs::integer_literal(42)),
+                stmts::then_expr(exprs::while_(
+                    exprs::lt(exprs::integer_literal(-1), exprs::var("x")),
+                    exprs::block(vec![stmts::then_expr(exprs::assign(
+                        "x",
+                        exprs::add(exprs::var("x"), exprs::integer_literal(-1)),
+                    ))]),
+                )),
+            ],
+        );
+        let function = lower(&s);
+        assert_eq!(
+            function,
+            sir::Function::describe(
+                0,
+                |desc, (x, tmp1, tmp2, tmp3, tmp4, tmp5), (entry, cond, body, cont)| {
+                    desc.block(
+                        entry,
+                        vec![insts::integer_literal(x, 42), insts::jump(cond)],
+                    );
+                    desc.block(
+                        cond,
+                        vec![
+                            insts::integer_literal(tmp2, -1),
+                            insts::copy(tmp3, x),
+                            insts::push_arg(tmp2),
+                            insts::push_arg(tmp3),
+                            insts::lt(tmp1),
+                            insts::branch(tmp1, body, cont),
+                        ],
+                    );
+                    desc.block(
+                        body,
+                        vec![
+                            insts::copy(tmp4, x),
+                            insts::integer_literal(tmp5, -1),
+                            insts::push_arg(tmp4),
+                            insts::push_arg(tmp5),
+                            insts::add(x),
+                            insts::unit_literal(tmp1),
+                            insts::jump(cond),
+                        ],
                     );
                     desc.block(cont, vec![insts::return_(tmp1)]);
                 }

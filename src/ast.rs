@@ -21,10 +21,22 @@ pub enum Expr {
         else_: Box<Expr>,
     },
     #[allow(unused)] // TODO: remove this annotation later
+    While { cond: Box<Expr>, body: Box<Expr> },
+    #[allow(unused)] // TODO: remove this annotation later
+    Block { stmts: Vec<Stmt> },
+    #[allow(unused)] // TODO: remove this annotation later
+    Assign {
+        name: String,
+        id: Id,
+        rhs: Box<Expr>,
+    },
+    #[allow(unused)] // TODO: remove this annotation later
     // TODO: use BigInt
     IntegerLiteral { value: i32 },
     #[allow(unused)] // TODO: remove this annotation later
     Add { lhs: Box<Expr>, rhs: Box<Expr> },
+    #[allow(unused)] // TODO: remove this annotation later
+    Lt { lhs: Box<Expr>, rhs: Box<Expr> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -91,8 +103,28 @@ fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
             assign_id_expr(cctx, scope, then);
             assign_id_expr(cctx, scope, else_);
         }
+        Expr::While { cond, body } => {
+            assign_id_expr(cctx, scope, cond);
+            assign_id_expr(cctx, scope, body);
+        }
+        Expr::Block { stmts } => {
+            assign_id_stmts(cctx, scope, stmts);
+        }
+        Expr::Assign { name, id, rhs } => {
+            assign_id_expr(cctx, scope, rhs);
+            if let Some(&found_id) = scope.bindings.get(name) {
+                *id = found_id;
+            } else {
+                // TODO: better error handling
+                panic!("undefined variable: {}", name);
+            }
+        }
         Expr::IntegerLiteral { .. } => {}
         Expr::Add { lhs, rhs } => {
+            assign_id_expr(cctx, scope, lhs);
+            assign_id_expr(cctx, scope, rhs);
+        }
+        Expr::Lt { lhs, rhs } => {
             assign_id_expr(cctx, scope, lhs);
             assign_id_expr(cctx, scope, rhs);
         }
@@ -145,12 +177,38 @@ pub mod testing {
             }
         }
 
+        pub fn while_(cond: Expr, body: Expr) -> Expr {
+            Expr::While {
+                cond: Box::new(cond),
+                body: Box::new(body),
+            }
+        }
+
+        pub fn block(stmts: Vec<Stmt>) -> Expr {
+            Expr::Block { stmts }
+        }
+
+        pub fn assign(name: &str, rhs: Expr) -> Expr {
+            Expr::Assign {
+                name: name.to_string(),
+                id: Id::dummy(),
+                rhs: Box::new(rhs),
+            }
+        }
+
         pub fn integer_literal(value: i32) -> Expr {
             Expr::IntegerLiteral { value }
         }
 
         pub fn add(lhs: Expr, rhs: Expr) -> Expr {
             Expr::Add {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            }
+        }
+
+        pub fn lt(lhs: Expr, rhs: Expr) -> Expr {
+            Expr::Lt {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
             }
