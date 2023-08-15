@@ -1,11 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Expr, Stmt};
+use crate::ast::{BuiltinIds, BuiltinKind, Expr, Stmt};
 use crate::cctx::Id;
 use crate::sir;
 
 #[allow(unused)] // TODO: remove this annotation later
-pub fn lower(stmts: &[Stmt]) -> sir::Function {
+pub fn lower(builtin_ids: &BuiltinIds, stmts: &[Stmt]) -> sir::Function {
     let num_args = 0;
     let mut num_named_vars = num_args;
 
@@ -29,7 +29,14 @@ pub fn lower(stmts: &[Stmt]) -> sir::Function {
     let mut bb_id = 0;
     let result_var = function.num_vars;
     function.num_vars += 1;
-    lower_stmts(stmts, &var_id_map, &mut function, &mut bb_id, result_var);
+    lower_stmts(
+        builtin_ids,
+        stmts,
+        &var_id_map,
+        &mut function,
+        &mut bb_id,
+        result_var,
+    );
     function.body[bb_id]
         .insts
         .push(sir::Inst::new(sir::InstKind::Return { rhs: result_var }));
@@ -37,6 +44,7 @@ pub fn lower(stmts: &[Stmt]) -> sir::Function {
 }
 
 fn lower_stmts(
+    builtin_ids: &BuiltinIds,
     stmts: &[Stmt],
     var_id_map: &HashMap<Id, usize>,
     function: &mut sir::Function,
@@ -46,11 +54,12 @@ fn lower_stmts(
     for (i, stmt) in stmts.iter().enumerate() {
         let is_last = i == stmts.len() - 1;
         let result_var = if is_last { Some(result_var) } else { None };
-        lower_stmt(stmt, var_id_map, function, bb_id, result_var);
+        lower_stmt(builtin_ids, stmt, var_id_map, function, bb_id, result_var);
     }
 }
 
 fn lower_stmt(
+    builtin_ids: &BuiltinIds,
     stmt: &Stmt,
     var_id_map: &HashMap<Id, usize>,
     function: &mut sir::Function,
@@ -62,7 +71,7 @@ fn lower_stmt(
             debug_assert!(!id.is_dummy());
 
             let var_id = var_id_map[id];
-            lower_expr(init, var_id_map, function, bb_id, var_id);
+            lower_expr(builtin_ids, init, var_id_map, function, bb_id, var_id);
             if let Some(result_var) = result_var {
                 function.body[*bb_id]
                     .insts
@@ -82,7 +91,14 @@ fn lower_stmt(
                 function.num_vars += 1;
                 result_var
             };
-            lower_expr(expr, var_id_map, function, bb_id, stmt_result_var);
+            lower_expr(
+                builtin_ids,
+                expr,
+                var_id_map,
+                function,
+                bb_id,
+                stmt_result_var,
+            );
             if result_var.is_some() && !*use_value {
                 // Return unit instead
                 function.body[*bb_id]
@@ -97,6 +113,7 @@ fn lower_stmt(
 }
 
 fn lower_expr(
+    builtin_ids: &BuiltinIds,
     expr: &Expr,
     var_id_map: &HashMap<Id, usize>,
     function: &mut sir::Function,
@@ -114,19 +131,19 @@ fn lower_expr(
                 }));
         }
         Expr::Branch { cond, then, else_ } => {
-            let cond_var = lower_expr2(cond, var_id_map, function, bb_id);
+            let cond_var = lower_expr2(builtin_ids, cond, var_id_map, function, bb_id);
 
             let branch_bb_id = *bb_id;
 
             let then_bb_id = function.body.len();
             function.body.push(sir::BasicBlock { insts: vec![] });
             *bb_id = then_bb_id;
-            lower_expr(then, var_id_map, function, bb_id, result_var);
+            lower_expr(builtin_ids, then, var_id_map, function, bb_id, result_var);
 
             let else_bb_id = function.body.len();
             function.body.push(sir::BasicBlock { insts: vec![] });
             *bb_id = else_bb_id;
-            lower_expr(else_, var_id_map, function, bb_id, result_var);
+            lower_expr(builtin_ids, else_, var_id_map, function, bb_id, result_var);
 
             let cont_bb_id = function.body.len();
             function.body.push(sir::BasicBlock { insts: vec![] });
@@ -152,12 +169,12 @@ fn lower_expr(
             let cond_bb_id = function.body.len();
             function.body.push(sir::BasicBlock { insts: vec![] });
             *bb_id = cond_bb_id;
-            lower_expr(cond, var_id_map, function, bb_id, result_var);
+            lower_expr(builtin_ids, cond, var_id_map, function, bb_id, result_var);
 
             let body_bb_id = function.body.len();
             function.body.push(sir::BasicBlock { insts: vec![] });
             *bb_id = body_bb_id;
-            lower_expr(body, var_id_map, function, bb_id, result_var);
+            lower_expr(builtin_ids, body, var_id_map, function, bb_id, result_var);
 
             let cont_bb_id = function.body.len();
             function.body.push(sir::BasicBlock { insts: vec![] });
@@ -177,17 +194,50 @@ fn lower_expr(
                 .insts
                 .push(sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }));
         }
-        Expr::Block { stmts } => lower_stmts(stmts, var_id_map, function, bb_id, result_var),
+        Expr::Block { stmts } => {
+            lower_stmts(builtin_ids, stmts, var_id_map, function, bb_id, result_var)
+        }
         Expr::Assign { name: _, id, rhs } => {
             debug_assert!(!id.is_dummy());
             let var_id = var_id_map[id];
-            lower_expr(rhs, var_id_map, function, bb_id, var_id);
+            lower_expr(builtin_ids, rhs, var_id_map, function, bb_id, var_id);
             function.body[*bb_id]
                 .insts
                 .push(sir::Inst::new(sir::InstKind::Literal {
                     lhs: result_var,
                     value: sir::Literal::Unit,
                 }));
+        }
+        Expr::Call { callee, args } => {
+            let builtin = if let Expr::Var { name: _, id } = &**callee {
+                builtin_ids.builtins.get(id).copied()
+            } else {
+                None
+            };
+            if let Some(builtin) = builtin {
+                let arg_vars = args
+                    .iter()
+                    .map(|arg| lower_expr2(builtin_ids, arg, var_id_map, function, bb_id))
+                    .collect::<Vec<_>>();
+                for &arg_var in &arg_vars {
+                    function.body[*bb_id]
+                        .insts
+                        .push(sir::Inst::new(sir::InstKind::PushArg {
+                            value_ref: arg_var,
+                        }));
+                }
+                function.body[*bb_id]
+                    .insts
+                    .push(sir::Inst::new(sir::InstKind::CallBuiltin {
+                        lhs: Some(result_var),
+                        builtin: match builtin {
+                            BuiltinKind::Puts => sir::BuiltinKind::Puts,
+                            BuiltinKind::Puti => sir::BuiltinKind::Puti,
+                        },
+                    }));
+            } else {
+                todo!("non-builtin call");
+            }
         }
         Expr::IntegerLiteral { value } => {
             function.body[*bb_id]
@@ -198,8 +248,8 @@ fn lower_expr(
                 }));
         }
         Expr::Add { lhs, rhs } => {
-            let lhs_var = lower_expr2(lhs, var_id_map, function, bb_id);
-            let rhs_var = lower_expr2(rhs, var_id_map, function, bb_id);
+            let lhs_var = lower_expr2(builtin_ids, lhs, var_id_map, function, bb_id);
+            let rhs_var = lower_expr2(builtin_ids, rhs, var_id_map, function, bb_id);
 
             let bb = &mut function.body[*bb_id];
             bb.insts.push(sir::Inst::new(sir::InstKind::PushArg {
@@ -214,8 +264,8 @@ fn lower_expr(
             }));
         }
         Expr::Lt { lhs, rhs } => {
-            let lhs_var = lower_expr2(lhs, var_id_map, function, bb_id);
-            let rhs_var = lower_expr2(rhs, var_id_map, function, bb_id);
+            let lhs_var = lower_expr2(builtin_ids, lhs, var_id_map, function, bb_id);
+            let rhs_var = lower_expr2(builtin_ids, rhs, var_id_map, function, bb_id);
 
             let bb = &mut function.body[*bb_id];
             bb.insts.push(sir::Inst::new(sir::InstKind::PushArg {
@@ -233,6 +283,7 @@ fn lower_expr(
 }
 
 fn lower_expr2(
+    builtin_ids: &BuiltinIds,
     expr: &Expr,
     var_id_map: &HashMap<Id, usize>,
     function: &mut sir::Function,
@@ -240,7 +291,7 @@ fn lower_expr2(
 ) -> usize {
     let result_var = function.num_vars;
     function.num_vars += 1;
-    lower_expr(expr, var_id_map, function, bb_id, result_var);
+    lower_expr(builtin_ids, expr, var_id_map, function, bb_id, result_var);
     result_var
 }
 
@@ -284,6 +335,12 @@ fn collect_vars_expr(expr: &Expr, vars: &mut HashSet<Id>) {
             vars.insert(*id);
             collect_vars_expr(rhs, vars);
         }
+        Expr::Call { callee, args } => {
+            collect_vars_expr(callee, vars);
+            for arg in args {
+                collect_vars_expr(arg, vars);
+            }
+        }
         Expr::IntegerLiteral { value: _ } => {}
         Expr::Add { lhs, rhs } => {
             collect_vars_expr(lhs, vars);
@@ -304,8 +361,8 @@ mod tests {
     use crate::cctx::CCtx;
     use crate::sir::testing::{insts, FunctionTestingExt};
 
-    fn assign_id(cctx: &mut CCtx, mut stmts: Vec<Stmt>) -> Vec<Stmt> {
-        let mut scope = Scope::default();
+    fn assign_id(cctx: &mut CCtx, builtin_ids: &BuiltinIds, mut stmts: Vec<Stmt>) -> Vec<Stmt> {
+        let mut scope = Scope::new(builtin_ids);
         assign_id_stmts(cctx, &mut scope, &mut stmts);
         stmts
     }
@@ -313,14 +370,16 @@ mod tests {
     #[test]
     fn test_lower_add() {
         let mut cctx = CCtx::new();
+        let builtin_ids = BuiltinIds::new(&cctx);
         let s = assign_id(
             &mut cctx,
+            &builtin_ids,
             vec![stmts::then_expr(exprs::add(
                 exprs::integer_literal(1),
                 exprs::integer_literal(2),
             ))],
         );
-        let function = lower(&s);
+        let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
             sir::Function::describe(0, |desc, (tmp1, tmp2, tmp3), (entry,)| {
@@ -342,14 +401,16 @@ mod tests {
     #[test]
     fn test_lower_simple_var() {
         let mut cctx = CCtx::new();
+        let builtin_ids = BuiltinIds::new(&cctx);
         let s = assign_id(
             &mut cctx,
+            &builtin_ids,
             vec![
                 stmts::let_("x", exprs::integer_literal(42)),
                 stmts::then_expr(exprs::var("x")),
             ],
         );
-        let function = lower(&s);
+        let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
             sir::Function::describe(0, |desc, (x, tmp1), (entry,)| {
@@ -368,8 +429,10 @@ mod tests {
     #[test]
     fn test_lower_branch() {
         let mut cctx = CCtx::new();
+        let builtin_ids = BuiltinIds::new(&cctx);
         let s = assign_id(
             &mut cctx,
+            &builtin_ids,
             vec![
                 stmts::let_("x", exprs::integer_literal(42)),
                 stmts::then_expr(exprs::branch(
@@ -379,7 +442,7 @@ mod tests {
                 )),
             ],
         );
-        let function = lower(&s);
+        let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
             sir::Function::describe(
@@ -410,8 +473,10 @@ mod tests {
     #[test]
     fn test_lower_loop() {
         let mut cctx = CCtx::new();
+        let builtin_ids = BuiltinIds::new(&cctx);
         let s = assign_id(
             &mut cctx,
+            &builtin_ids,
             vec![
                 stmts::let_("x", exprs::integer_literal(42)),
                 stmts::then_expr(exprs::while_(
@@ -423,7 +488,7 @@ mod tests {
                 )),
             ],
         );
-        let function = lower(&s);
+        let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
             sir::Function::describe(
@@ -459,6 +524,35 @@ mod tests {
                     desc.block(cont, vec![insts::return_(tmp1)]);
                 }
             )
+        );
+    }
+
+    #[test]
+    fn test_puti() {
+        let mut cctx = CCtx::new();
+        let builtin_ids = BuiltinIds::new(&cctx);
+        let s = assign_id(
+            &mut cctx,
+            &builtin_ids,
+            vec![stmts::then_expr(exprs::call(
+                exprs::var("puti"),
+                vec![exprs::integer_literal(42)],
+            ))],
+        );
+        let function = lower(&builtin_ids, &s);
+        assert_eq!(
+            function,
+            sir::Function::describe(0, |desc, (_tmp1, tmp2, tmp3), (entry,)| {
+                desc.block(
+                    entry,
+                    vec![
+                        insts::integer_literal(tmp3, 42),
+                        insts::push_arg(tmp3),
+                        insts::puti2(tmp2),
+                        insts::return_(tmp2),
+                    ],
+                );
+            })
         );
     }
 }

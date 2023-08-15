@@ -31,6 +31,8 @@ pub enum Expr {
         rhs: Box<Expr>,
     },
     #[allow(unused)] // TODO: remove this annotation later
+    Call { callee: Box<Expr>, args: Vec<Expr> },
+    #[allow(unused)] // TODO: remove this annotation later
     // TODO: use BigInt
     IntegerLiteral { value: i32 },
     #[allow(unused)] // TODO: remove this annotation later
@@ -40,12 +42,59 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct BuiltinIds {
+    pub ids: HashMap<BuiltinKind, Id>,
+    pub builtins: HashMap<Id, BuiltinKind>,
+}
+
+impl BuiltinIds {
+    pub fn new(cctx: &CCtx) -> Self {
+        let mut builtin_ids = BuiltinIds::default();
+        for builtin_kind in BuiltinKind::iter() {
+            let id = cctx.id_gen.fresh();
+            builtin_ids.ids.insert(builtin_kind, id);
+            builtin_ids.builtins.insert(id, builtin_kind);
+        }
+        builtin_ids
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BuiltinKind {
+    Puts,
+    Puti,
+}
+
+impl BuiltinKind {
+    fn name(self) -> &'static str {
+        match self {
+            BuiltinKind::Puts => "puts",
+            BuiltinKind::Puti => "puti",
+        }
+    }
+    fn iter() -> impl Iterator<Item = Self> {
+        static BUILTIN_KINDS: &[BuiltinKind] = &[BuiltinKind::Puts, BuiltinKind::Puti];
+        BUILTIN_KINDS.iter().copied()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scope {
     bindings: HashMap<String, Id>,
     binding_stack: Vec<(String, Option<Id>)>,
 }
 
 impl Scope {
+    pub fn new(builtin_ids: &BuiltinIds) -> Self {
+        let mut scope = Scope {
+            bindings: HashMap::default(),
+            binding_stack: vec![],
+        };
+        for (builtin_id, builtin_kind) in &builtin_ids.builtins {
+            scope.insert(builtin_kind.name(), *builtin_id);
+        }
+        scope
+    }
     fn insert(&mut self, name: &str, id: Id) {
         self.binding_stack
             .push((name.to_owned(), self.bindings.insert(name.to_owned(), id)));
@@ -117,6 +166,12 @@ fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
             } else {
                 // TODO: better error handling
                 panic!("undefined variable: {}", name);
+            }
+        }
+        Expr::Call { callee, args } => {
+            assign_id_expr(cctx, scope, callee);
+            for arg in args {
+                assign_id_expr(cctx, scope, arg);
             }
         }
         Expr::IntegerLiteral { .. } => {}
@@ -193,6 +248,13 @@ pub mod testing {
                 name: name.to_string(),
                 id: Id::dummy(),
                 rhs: Box::new(rhs),
+            }
+        }
+
+        pub fn call(callee: Expr, args: Vec<Expr>) -> Expr {
+            Expr::Call {
+                callee: Box::new(callee),
+                args,
             }
         }
 

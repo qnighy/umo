@@ -326,5 +326,11 @@ pub mod testing {
                 builtin: BuiltinKind::Puti,
             })
         }
+        pub fn puti2(lhs: usize) -> Inst {
+            Inst::new(InstKind::CallBuiltin {
+                lhs: Some(lhs),
+                builtin: BuiltinKind::Puti,
+            })
+        }
     }
 }
