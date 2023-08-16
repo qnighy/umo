@@ -34,7 +34,7 @@ impl Function {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct BasicBlock {
     pub insts: Vec<Inst>,
 }
@@ -44,6 +44,11 @@ impl BasicBlock {
         assert!(insts.len() > 0);
         assert!(insts[..insts.len() - 1].iter().all(|i| i.kind.is_middle()));
         assert!(insts.last().unwrap().kind.is_tail());
+        Self { insts }
+    }
+
+    pub fn new_partial(insts: Vec<Inst>) -> Self {
+        assert!(insts.iter().all(|i| i.kind.is_middle()));
         Self { insts }
     }
 }
@@ -219,7 +224,7 @@ pub mod testing {
                 function: Self::new(
                     num_args,
                     VS::size(),
-                    vec![BasicBlock { insts: vec![] }; BS::size()],
+                    vec![BasicBlock::default(); BS::size()],
                 ),
             };
             f(&mut desc, VS::seq(), BS::seq());

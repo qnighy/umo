@@ -21,11 +21,8 @@ pub fn lower(builtin_ids: &BuiltinIds, stmts: &[Stmt]) -> sir::Function {
         num_named_vars += 1;
     }
 
-    let mut function = sir::Function::new(
-        num_args,
-        num_named_vars,
-        vec![sir::BasicBlock { insts: vec![] }],
-    );
+    let mut function =
+        sir::Function::new(num_args, num_named_vars, vec![sir::BasicBlock::default()]);
     let mut fctx = FunctionContext {
         builtin_ids,
         function: &mut function,
@@ -52,7 +49,7 @@ impl FunctionContext<'_> {
     }
     fn new_bb(&mut self) -> usize {
         let bb_id = self.function.body.len();
-        self.function.body.push(sir::BasicBlock { insts: vec![] });
+        self.function.body.push(sir::BasicBlock::default());
         bb_id
     }
     fn current_bb_id(&self) -> usize {
