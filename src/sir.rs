@@ -94,11 +94,11 @@ pub enum InstKind {
     },
     #[allow(unused)] // TODO: remove it later
     Call {
-        lhs: Option<usize>,
+        lhs: usize,
         callee: usize,
     },
     CallBuiltin {
-        lhs: Option<usize>,
+        lhs: usize,
         builtin: BuiltinKind,
     },
 }
@@ -298,37 +298,31 @@ pub mod testing {
         }
         pub fn call(lhs: usize, function: usize) -> Inst {
             Inst::new(InstKind::Call {
-                lhs: Some(lhs),
+                lhs,
                 callee: function,
             })
         }
         pub fn add(lhs: usize) -> Inst {
             Inst::new(InstKind::CallBuiltin {
-                lhs: Some(lhs),
+                lhs,
                 builtin: BuiltinKind::Add,
             })
         }
         pub fn lt(lhs: usize) -> Inst {
             Inst::new(InstKind::CallBuiltin {
-                lhs: Some(lhs),
+                lhs,
                 builtin: BuiltinKind::Lt,
             })
         }
-        pub fn puts() -> Inst {
+        pub fn puts(dummy_lhs: usize) -> Inst {
             Inst::new(InstKind::CallBuiltin {
-                lhs: None,
+                lhs: dummy_lhs,
                 builtin: BuiltinKind::Puts,
             })
         }
-        pub fn puti() -> Inst {
+        pub fn puti(dummy_lhs: usize) -> Inst {
             Inst::new(InstKind::CallBuiltin {
-                lhs: None,
-                builtin: BuiltinKind::Puti,
-            })
-        }
-        pub fn puti2(lhs: usize) -> Inst {
-            Inst::new(InstKind::CallBuiltin {
-                lhs: Some(lhs),
+                lhs: dummy_lhs,
                 builtin: BuiltinKind::Puti,
             })
         }

@@ -98,14 +98,10 @@ fn liveness_bb(
                 alive.insert(*value_ref);
             }
             InstKind::Call { lhs, .. } => {
-                if let Some(lhs) = lhs {
-                    alive.remove(*lhs);
-                }
+                alive.remove(*lhs);
             }
             InstKind::CallBuiltin { lhs, .. } => {
-                if let Some(lhs) = lhs {
-                    alive.remove(*lhs);
-                }
+                alive.remove(*lhs);
             }
         }
         *updated = *updated
@@ -263,8 +259,8 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
         InstKind::Drop { .. } => None,
         InstKind::Literal { lhs, .. } => Some(*lhs),
         InstKind::PushArg { .. } => None,
-        InstKind::Call { lhs, .. } => *lhs,
-        InstKind::CallBuiltin { lhs, .. } => *lhs,
+        InstKind::Call { lhs, .. } => Some(*lhs),
+        InstKind::CallBuiltin { lhs, .. } => Some(*lhs),
     }
 }
 
@@ -277,16 +273,16 @@ mod tests {
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
             vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
-                insts::puts(),
+                insts::puts(tmp2),
                 insts::push_arg(x),
-                insts::puts(),
+                insts::puts(tmp2),
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
-                insts::puts(),
+                insts::puts(tmp2),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]
@@ -294,17 +290,20 @@ mod tests {
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
+            ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2, tmp3)| {
                 vec![
                     insts::string_literal(x, "Hello, world!"),
-                    insts::copy(tmp2, x),
-                    insts::push_arg(tmp2),
-                    insts::puts(),
+                    insts::copy(tmp3, x),
+                    insts::push_arg(tmp3),
+                    insts::puts(tmp2),
+                    insts::drop(tmp2),
                     insts::push_arg(x),
-                    insts::puts(),
+                    insts::puts(tmp2),
+                    insts::drop(tmp2),
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
-                    insts::puts(),
+                    insts::puts(tmp2),
+                    insts::drop(tmp2),
                     insts::unit_literal(tmp1),
                     insts::return_(tmp1),
                 ]
@@ -315,12 +314,12 @@ mod tests {
     #[test]
     fn test_compile_drop() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
             vec![
                 insts::string_literal(x, "dummy"),
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
-                insts::puts(),
+                insts::puts(tmp2),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]
@@ -328,13 +327,14 @@ mod tests {
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
+            ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
                 vec![
                     insts::string_literal(x, "dummy"),
                     insts::drop(x),
                     insts::string_literal(x, "Hello, world!"),
                     insts::push_arg(x),
-                    insts::puts(),
+                    insts::puts(tmp2),
+                    insts::drop(tmp2),
                     insts::unit_literal(tmp1),
                     insts::return_(tmp1),
                 ]

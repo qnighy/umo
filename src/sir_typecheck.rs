@@ -205,16 +205,12 @@ fn typecheck_bb(
                 for (arg_type, param_type) in args.iter().zip(&pctx.functions[*callee].args) {
                     ty_ctx.unify(arg_type, param_type)?;
                 }
-                if let Some(lhs) = lhs {
-                    ty_ctx.unify(&state.vars[*lhs], &pctx.functions[*callee].ret)?;
-                }
+                ty_ctx.unify(&state.vars[*lhs], &pctx.functions[*callee].ret)?;
             }
             InstKind::CallBuiltin { lhs, builtin: f } => {
                 let args = std::mem::replace(&mut args, vec![]);
                 let return_type = typecheck_builtin(cctx, ty_ctx, *f, args)?;
-                if let Some(lhs) = lhs {
-                    ty_ctx.unify(&state.vars[*lhs], &return_type)?;
-                }
+                ty_ctx.unify(&state.vars[*lhs], &return_type)?;
             }
         }
     }
@@ -294,13 +290,13 @@ mod tests {
     fn test_typecheck_success() {
         let cctx = CCtx::new();
         let program_unit =
-            ProgramUnit::simple(Function::describe(0, |desc, (x, tmp1), (entry,)| {
+            ProgramUnit::simple(Function::describe(0, |desc, (x, tmp1, tmp2), (entry,)| {
                 desc.block(
                     entry,
                     vec![
                         insts::integer_literal(x, 42),
                         insts::push_arg(x),
-                        insts::puti(),
+                        insts::puti(tmp2),
                         insts::unit_literal(tmp1),
                         insts::return_(tmp1),
                     ],
@@ -312,9 +308,9 @@ mod tests {
     #[test]
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(tmp1,)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(tmp1, tmp2)| {
             vec![
-                insts::puti(),
+                insts::puti(tmp2),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]
@@ -325,12 +321,12 @@ mod tests {
     #[test]
     fn test_typecheck_failure_too_many_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
             vec![
                 insts::integer_literal(x, 42),
                 insts::push_arg(x),
                 insts::push_arg(x),
-                insts::puti(),
+                insts::puti(tmp2),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]
@@ -341,11 +337,11 @@ mod tests {
     #[test]
     fn test_typecheck_failure_arg_type_mismatch() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
             vec![
                 insts::string_literal(x, "Hello, world!"),
                 insts::push_arg(x),
-                insts::puti(),
+                insts::puti(tmp2),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]

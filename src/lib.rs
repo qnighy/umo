@@ -21,7 +21,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
                 0,
-                2,
+                3,
                 vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 0,
@@ -29,7 +29,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
                     sir::Inst::new(sir::InstKind::CallBuiltin {
-                        lhs: None,
+                        lhs: 2,
                         builtin: sir::BuiltinKind::Puts,
                     }),
                     sir::Inst::new(sir::InstKind::Literal {
@@ -45,7 +45,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
                 0,
-                4,
+                5,
                 vec![sir::BasicBlock::new(vec![
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 0,
@@ -58,12 +58,12 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 1 }),
                     sir::Inst::new(sir::InstKind::CallBuiltin {
-                        lhs: Some(2),
+                        lhs: 2,
                         builtin: sir::BuiltinKind::Add,
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 2 }),
                     sir::Inst::new(sir::InstKind::CallBuiltin {
-                        lhs: None,
+                        lhs: 4,
                         builtin: sir::BuiltinKind::Puti,
                     }),
                     sir::Inst::new(sir::InstKind::Literal {

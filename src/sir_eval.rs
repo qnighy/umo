@@ -89,16 +89,12 @@ fn eval1_bb(
                 let args = mem::replace(&mut state.args, vec![]);
                 let return_value =
                     eval1_function(ctx, program_unit, &program_unit.functions[*callee], args);
-                if let Some(lhs) = lhs {
-                    state.vars[*lhs] = Some(return_value);
-                }
+                state.vars[*lhs] = Some(return_value);
             }
             InstKind::CallBuiltin { lhs, builtin: f } => {
                 let args = mem::replace(&mut state.args, vec![]);
                 let return_value = eval_builtin(ctx, *f, args);
-                if let Some(lhs) = lhs {
-                    state.vars[*lhs] = Some(return_value);
-                }
+                state.vars[*lhs] = Some(return_value);
             }
         }
     }

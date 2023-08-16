@@ -229,7 +229,7 @@ fn lower_expr(
                 function.body[*bb_id]
                     .insts
                     .push(sir::Inst::new(sir::InstKind::CallBuiltin {
-                        lhs: Some(result_var),
+                        lhs: result_var,
                         builtin: match builtin {
                             BuiltinKind::Puts => sir::BuiltinKind::Puts,
                             BuiltinKind::Puti => sir::BuiltinKind::Puti,
@@ -259,7 +259,7 @@ fn lower_expr(
                 value_ref: rhs_var,
             }));
             bb.insts.push(sir::Inst::new(sir::InstKind::CallBuiltin {
-                lhs: Some(result_var),
+                lhs: result_var,
                 builtin: sir::BuiltinKind::Add,
             }));
         }
@@ -275,7 +275,7 @@ fn lower_expr(
                 value_ref: rhs_var,
             }));
             bb.insts.push(sir::Inst::new(sir::InstKind::CallBuiltin {
-                lhs: Some(result_var),
+                lhs: result_var,
                 builtin: sir::BuiltinKind::Lt,
             }));
         }
@@ -548,7 +548,7 @@ mod tests {
                     vec![
                         insts::integer_literal(tmp3, 42),
                         insts::push_arg(tmp3),
-                        insts::puti2(tmp2),
+                        insts::puti(tmp2),
                         insts::return_(tmp2),
                     ],
                 );
