@@ -36,9 +36,17 @@ pub enum Expr {
     // TODO: use BigInt
     IntegerLiteral { value: i32 },
     #[allow(unused)] // TODO: remove this annotation later
-    Add { lhs: Box<Expr>, rhs: Box<Expr> },
-    #[allow(unused)] // TODO: remove this annotation later
-    Lt { lhs: Box<Expr>, rhs: Box<Expr> },
+    BinOp {
+        op: BinOp,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BinOp {
+    Add,
+    Lt,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -175,11 +183,7 @@ fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
             }
         }
         Expr::IntegerLiteral { .. } => {}
-        Expr::Add { lhs, rhs } => {
-            assign_id_expr(cctx, scope, lhs);
-            assign_id_expr(cctx, scope, rhs);
-        }
-        Expr::Lt { lhs, rhs } => {
+        Expr::BinOp { op: _, lhs, rhs } => {
             assign_id_expr(cctx, scope, lhs);
             assign_id_expr(cctx, scope, rhs);
         }
@@ -263,14 +267,16 @@ pub mod testing {
         }
 
         pub fn add(lhs: Expr, rhs: Expr) -> Expr {
-            Expr::Add {
+            Expr::BinOp {
+                op: BinOp::Add,
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
             }
         }
 
         pub fn lt(lhs: Expr, rhs: Expr) -> Expr {
-            Expr::Lt {
+            Expr::BinOp {
+                op: BinOp::Lt,
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs),
             }

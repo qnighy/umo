@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{BuiltinIds, BuiltinKind, Expr, Stmt};
+use crate::ast::{BinOp, BuiltinIds, BuiltinKind, Expr, Stmt};
 use crate::cctx::Id;
 use crate::sir;
 
@@ -247,7 +247,7 @@ fn lower_expr(
                     value: sir::Literal::Integer(*value),
                 }));
         }
-        Expr::Add { lhs, rhs } => {
+        Expr::BinOp { op, lhs, rhs } => {
             let lhs_var = lower_expr2(builtin_ids, lhs, var_id_map, function, bb_id);
             let rhs_var = lower_expr2(builtin_ids, rhs, var_id_map, function, bb_id);
 
@@ -260,23 +260,10 @@ fn lower_expr(
             }));
             bb.insts.push(sir::Inst::new(sir::InstKind::CallBuiltin {
                 lhs: result_var,
-                builtin: sir::BuiltinKind::Add,
-            }));
-        }
-        Expr::Lt { lhs, rhs } => {
-            let lhs_var = lower_expr2(builtin_ids, lhs, var_id_map, function, bb_id);
-            let rhs_var = lower_expr2(builtin_ids, rhs, var_id_map, function, bb_id);
-
-            let bb = &mut function.body[*bb_id];
-            bb.insts.push(sir::Inst::new(sir::InstKind::PushArg {
-                value_ref: lhs_var,
-            }));
-            bb.insts.push(sir::Inst::new(sir::InstKind::PushArg {
-                value_ref: rhs_var,
-            }));
-            bb.insts.push(sir::Inst::new(sir::InstKind::CallBuiltin {
-                lhs: result_var,
-                builtin: sir::BuiltinKind::Lt,
+                builtin: match op {
+                    BinOp::Add => sir::BuiltinKind::Add,
+                    BinOp::Lt => sir::BuiltinKind::Lt,
+                },
             }));
         }
     }
@@ -342,11 +329,7 @@ fn collect_vars_expr(expr: &Expr, vars: &mut HashSet<Id>) {
             }
         }
         Expr::IntegerLiteral { value: _ } => {}
-        Expr::Add { lhs, rhs } => {
-            collect_vars_expr(lhs, vars);
-            collect_vars_expr(rhs, vars);
-        }
-        Expr::Lt { lhs, rhs } => {
+        Expr::BinOp { op: _, lhs, rhs } => {
             collect_vars_expr(lhs, vars);
             collect_vars_expr(rhs, vars);
         }
