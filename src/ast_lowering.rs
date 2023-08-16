@@ -26,59 +26,66 @@ pub fn lower(builtin_ids: &BuiltinIds, stmts: &[Stmt]) -> sir::Function {
         num_named_vars,
         vec![sir::BasicBlock { insts: vec![] }],
     );
-    let mut bb_id = 0;
-    let result_var = function.num_vars;
-    function.num_vars += 1;
-    lower_stmts(
+    let mut fctx = FunctionContext {
         builtin_ids,
-        stmts,
-        &var_id_map,
-        &mut function,
-        &mut bb_id,
-        result_var,
-    );
-    function.body[bb_id]
-        .insts
-        .push(sir::Inst::new(sir::InstKind::Return { rhs: result_var }));
+        function: &mut function,
+        var_id_map: &var_id_map,
+    };
+    let result_var = fctx.fresh_var();
+    lower_stmts(&mut fctx, stmts, result_var);
+    fctx.push(sir::Inst::new(sir::InstKind::Return { rhs: result_var }));
     function
 }
 
-fn lower_stmts(
-    builtin_ids: &BuiltinIds,
-    stmts: &[Stmt],
-    var_id_map: &HashMap<Id, usize>,
-    function: &mut sir::Function,
-    bb_id: &mut usize,
-    result_var: usize,
-) {
-    for (i, stmt) in stmts.iter().enumerate() {
-        let is_last = i == stmts.len() - 1;
-        let result_var = if is_last { Some(result_var) } else { None };
-        lower_stmt(builtin_ids, stmt, var_id_map, function, bb_id, result_var);
+#[derive(Debug)]
+struct FunctionContext<'a> {
+    builtin_ids: &'a BuiltinIds,
+    function: &'a mut sir::Function,
+    var_id_map: &'a HashMap<Id, usize>,
+}
+
+impl FunctionContext<'_> {
+    fn fresh_var(&mut self) -> usize {
+        let var = self.function.num_vars;
+        self.function.num_vars += 1;
+        var
+    }
+    fn new_bb(&mut self) -> usize {
+        let bb_id = self.function.body.len();
+        self.function.body.push(sir::BasicBlock { insts: vec![] });
+        bb_id
+    }
+    fn current_bb_id(&self) -> usize {
+        self.function.body.len() - 1
+    }
+    fn push_at(&mut self, bb_id: usize, inst: sir::Inst) {
+        self.function.body[bb_id].insts.push(inst);
+    }
+    fn push(&mut self, inst: sir::Inst) {
+        self.function.body.last_mut().unwrap().insts.push(inst);
     }
 }
 
-fn lower_stmt(
-    builtin_ids: &BuiltinIds,
-    stmt: &Stmt,
-    var_id_map: &HashMap<Id, usize>,
-    function: &mut sir::Function,
-    bb_id: &mut usize,
-    result_var: Option<usize>,
-) {
+fn lower_stmts(fctx: &mut FunctionContext<'_>, stmts: &[Stmt], result_var: usize) {
+    for (i, stmt) in stmts.iter().enumerate() {
+        let is_last = i == stmts.len() - 1;
+        let result_var = if is_last { Some(result_var) } else { None };
+        lower_stmt(fctx, stmt, result_var);
+    }
+}
+
+fn lower_stmt(fctx: &mut FunctionContext<'_>, stmt: &Stmt, result_var: Option<usize>) {
     match stmt {
         Stmt::Let { name: _, id, init } => {
             debug_assert!(!id.is_dummy());
 
-            let var_id = var_id_map[id];
-            lower_expr(builtin_ids, init, var_id_map, function, bb_id, var_id);
+            let var_id = fctx.var_id_map[id];
+            lower_expr(fctx, init, var_id);
             if let Some(result_var) = result_var {
-                function.body[*bb_id]
-                    .insts
-                    .push(sir::Inst::new(sir::InstKind::Literal {
-                        lhs: result_var,
-                        value: sir::Literal::Unit,
-                    }))
+                fctx.push(sir::Inst::new(sir::InstKind::Literal {
+                    lhs: result_var,
+                    value: sir::Literal::Unit,
+                }))
             }
         }
         Stmt::Expr { expr, use_value } => {
@@ -87,178 +94,141 @@ fn lower_stmt(
                 result_var.unwrap()
             } else {
                 // Generate dummy temporary
-                let result_var = function.num_vars;
-                function.num_vars += 1;
-                result_var
+                fctx.fresh_var()
             };
-            lower_expr(
-                builtin_ids,
-                expr,
-                var_id_map,
-                function,
-                bb_id,
-                stmt_result_var,
-            );
+            lower_expr(fctx, expr, stmt_result_var);
             if result_var.is_some() && !*use_value {
                 // Return unit instead
-                function.body[*bb_id]
-                    .insts
-                    .push(sir::Inst::new(sir::InstKind::Literal {
-                        lhs: result_var.unwrap(),
-                        value: sir::Literal::Unit,
-                    }))
+                fctx.push(sir::Inst::new(sir::InstKind::Literal {
+                    lhs: result_var.unwrap(),
+                    value: sir::Literal::Unit,
+                }))
             }
         }
     }
 }
 
-fn lower_expr(
-    builtin_ids: &BuiltinIds,
-    expr: &Expr,
-    var_id_map: &HashMap<Id, usize>,
-    function: &mut sir::Function,
-    bb_id: &mut usize,
-    result_var: usize,
-) {
+fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
     match expr {
         Expr::Var { name: _, id } => {
-            let var_id = var_id_map[id];
-            function.body[*bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Copy {
-                    lhs: result_var,
-                    rhs: var_id,
-                }));
+            let var_id = fctx.var_id_map[id];
+            fctx.push(sir::Inst::new(sir::InstKind::Copy {
+                lhs: result_var,
+                rhs: var_id,
+            }));
         }
         Expr::Branch { cond, then, else_ } => {
-            let cond_var = lower_expr2(builtin_ids, cond, var_id_map, function, bb_id);
+            let cond_var = lower_expr2(fctx, cond);
 
-            let branch_bb_id = *bb_id;
+            let branch_bb_id = fctx.current_bb_id();
 
-            let then_bb_id = function.body.len();
-            function.body.push(sir::BasicBlock { insts: vec![] });
-            *bb_id = then_bb_id;
-            lower_expr(builtin_ids, then, var_id_map, function, bb_id, result_var);
+            let then_bb_id = fctx.new_bb();
+            lower_expr(fctx, then, result_var);
 
-            let else_bb_id = function.body.len();
-            function.body.push(sir::BasicBlock { insts: vec![] });
-            *bb_id = else_bb_id;
-            lower_expr(builtin_ids, else_, var_id_map, function, bb_id, result_var);
+            let else_bb_id = fctx.new_bb();
+            lower_expr(fctx, else_, result_var);
 
-            let cont_bb_id = function.body.len();
-            function.body.push(sir::BasicBlock { insts: vec![] });
-            *bb_id = cont_bb_id;
+            let cont_bb_id = fctx.new_bb();
 
-            function.body[branch_bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Branch {
+            fctx.push_at(
+                branch_bb_id,
+                sir::Inst::new(sir::InstKind::Branch {
                     cond: cond_var,
                     branch_then: then_bb_id,
                     branch_else: else_bb_id,
-                }));
-            function.body[then_bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }));
-            function.body[else_bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }));
+                }),
+            );
+            fctx.push_at(
+                then_bb_id,
+                sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }),
+            );
+            fctx.push_at(
+                else_bb_id,
+                sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }),
+            );
         }
         Expr::While { cond, body } => {
-            let prev_bb_id = *bb_id;
+            let prev_bb_id = fctx.current_bb_id();
 
-            let cond_bb_id = function.body.len();
-            function.body.push(sir::BasicBlock { insts: vec![] });
-            *bb_id = cond_bb_id;
-            lower_expr(builtin_ids, cond, var_id_map, function, bb_id, result_var);
+            let cond_bb_id = fctx.new_bb();
+            lower_expr(fctx, cond, result_var);
 
-            let body_bb_id = function.body.len();
-            function.body.push(sir::BasicBlock { insts: vec![] });
-            *bb_id = body_bb_id;
-            lower_expr(builtin_ids, body, var_id_map, function, bb_id, result_var);
+            let body_bb_id = fctx.new_bb();
+            lower_expr(fctx, body, result_var);
 
-            let cont_bb_id = function.body.len();
-            function.body.push(sir::BasicBlock { insts: vec![] });
-            *bb_id = cont_bb_id;
+            let cont_bb_id = fctx.new_bb();
 
-            function.body[prev_bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }));
-            function.body[cond_bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Branch {
+            fctx.push_at(
+                prev_bb_id,
+                sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }),
+            );
+            fctx.push_at(
+                cond_bb_id,
+                sir::Inst::new(sir::InstKind::Branch {
                     cond: result_var,
                     branch_then: body_bb_id,
                     branch_else: cont_bb_id,
-                }));
-            function.body[body_bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }));
+                }),
+            );
+            fctx.push_at(
+                body_bb_id,
+                sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }),
+            );
         }
-        Expr::Block { stmts } => {
-            lower_stmts(builtin_ids, stmts, var_id_map, function, bb_id, result_var)
-        }
+        Expr::Block { stmts } => lower_stmts(fctx, stmts, result_var),
         Expr::Assign { name: _, id, rhs } => {
             debug_assert!(!id.is_dummy());
-            let var_id = var_id_map[id];
-            lower_expr(builtin_ids, rhs, var_id_map, function, bb_id, var_id);
-            function.body[*bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Literal {
-                    lhs: result_var,
-                    value: sir::Literal::Unit,
-                }));
+            let var_id = fctx.var_id_map[id];
+            lower_expr(fctx, rhs, var_id);
+            fctx.push(sir::Inst::new(sir::InstKind::Literal {
+                lhs: result_var,
+                value: sir::Literal::Unit,
+            }));
         }
         Expr::Call { callee, args } => {
             let builtin = if let Expr::Var { name: _, id } = &**callee {
-                builtin_ids.builtins.get(id).copied()
+                fctx.builtin_ids.builtins.get(id).copied()
             } else {
                 None
             };
             if let Some(builtin) = builtin {
                 let arg_vars = args
                     .iter()
-                    .map(|arg| lower_expr2(builtin_ids, arg, var_id_map, function, bb_id))
+                    .map(|arg| lower_expr2(fctx, arg))
                     .collect::<Vec<_>>();
                 for &arg_var in &arg_vars {
-                    function.body[*bb_id]
-                        .insts
-                        .push(sir::Inst::new(sir::InstKind::PushArg {
-                            value_ref: arg_var,
-                        }));
-                }
-                function.body[*bb_id]
-                    .insts
-                    .push(sir::Inst::new(sir::InstKind::CallBuiltin {
-                        lhs: result_var,
-                        builtin: match builtin {
-                            BuiltinKind::Puts => sir::BuiltinKind::Puts,
-                            BuiltinKind::Puti => sir::BuiltinKind::Puti,
-                        },
+                    fctx.push(sir::Inst::new(sir::InstKind::PushArg {
+                        value_ref: arg_var,
                     }));
+                }
+                fctx.push(sir::Inst::new(sir::InstKind::CallBuiltin {
+                    lhs: result_var,
+                    builtin: match builtin {
+                        BuiltinKind::Puts => sir::BuiltinKind::Puts,
+                        BuiltinKind::Puti => sir::BuiltinKind::Puti,
+                    },
+                }));
             } else {
                 todo!("non-builtin call");
             }
         }
         Expr::IntegerLiteral { value } => {
-            function.body[*bb_id]
-                .insts
-                .push(sir::Inst::new(sir::InstKind::Literal {
-                    lhs: result_var,
-                    value: sir::Literal::Integer(*value),
-                }));
+            fctx.push(sir::Inst::new(sir::InstKind::Literal {
+                lhs: result_var,
+                value: sir::Literal::Integer(*value),
+            }));
         }
         Expr::BinOp { op, lhs, rhs } => {
-            let lhs_var = lower_expr2(builtin_ids, lhs, var_id_map, function, bb_id);
-            let rhs_var = lower_expr2(builtin_ids, rhs, var_id_map, function, bb_id);
+            let lhs_var = lower_expr2(fctx, lhs);
+            let rhs_var = lower_expr2(fctx, rhs);
 
-            let bb = &mut function.body[*bb_id];
-            bb.insts.push(sir::Inst::new(sir::InstKind::PushArg {
+            fctx.push(sir::Inst::new(sir::InstKind::PushArg {
                 value_ref: lhs_var,
             }));
-            bb.insts.push(sir::Inst::new(sir::InstKind::PushArg {
+            fctx.push(sir::Inst::new(sir::InstKind::PushArg {
                 value_ref: rhs_var,
             }));
-            bb.insts.push(sir::Inst::new(sir::InstKind::CallBuiltin {
+            fctx.push(sir::Inst::new(sir::InstKind::CallBuiltin {
                 lhs: result_var,
                 builtin: match op {
                     BinOp::Add => sir::BuiltinKind::Add,
@@ -269,16 +239,9 @@ fn lower_expr(
     }
 }
 
-fn lower_expr2(
-    builtin_ids: &BuiltinIds,
-    expr: &Expr,
-    var_id_map: &HashMap<Id, usize>,
-    function: &mut sir::Function,
-    bb_id: &mut usize,
-) -> usize {
-    let result_var = function.num_vars;
-    function.num_vars += 1;
-    lower_expr(builtin_ids, expr, var_id_map, function, bb_id, result_var);
+fn lower_expr2(fctx: &mut FunctionContext<'_>, expr: &Expr) -> usize {
+    let result_var = fctx.fresh_var();
+    lower_expr(fctx, expr, result_var);
     result_var
 }
 
