@@ -94,17 +94,20 @@ pub enum InstKind {
         lhs: usize,
         value: Literal,
     },
+    Closure {
+        lhs: usize,
+        function_id: usize,
+    },
+    Builtin {
+        lhs: usize,
+        builtin: BuiltinKind,
+    },
     PushArg {
         value_ref: usize,
     },
-    #[allow(unused)] // TODO: remove it later
-    Call {
+    Call_ {
         lhs: usize,
         callee: usize,
-    },
-    CallBuiltin {
-        lhs: usize,
-        builtin: BuiltinKind,
     },
 }
 
@@ -116,8 +119,9 @@ impl InstKind {
             | InstKind::Drop { .. }
             | InstKind::Literal { .. }
             | InstKind::PushArg { .. }
-            | InstKind::Call { .. }
-            | InstKind::CallBuiltin { .. } => false,
+            | InstKind::Closure { .. }
+            | InstKind::Builtin { .. }
+            | InstKind::Call_ { .. } => false,
         }
     }
     pub fn is_middle(&self) -> bool {
@@ -298,38 +302,17 @@ pub mod testing {
                 value: Literal::String(Arc::new(value.to_owned())),
             })
         }
+        pub fn closure(lhs: usize, function_id: usize) -> Inst {
+            Inst::new(InstKind::Closure { lhs, function_id })
+        }
+        pub fn builtin(lhs: usize, builtin: BuiltinKind) -> Inst {
+            Inst::new(InstKind::Builtin { lhs, builtin })
+        }
         pub fn push_arg(value_ref: usize) -> Inst {
             Inst::new(InstKind::PushArg { value_ref })
         }
-        pub fn call(lhs: usize, function: usize) -> Inst {
-            Inst::new(InstKind::Call {
-                lhs,
-                callee: function,
-            })
-        }
-        pub fn add(lhs: usize) -> Inst {
-            Inst::new(InstKind::CallBuiltin {
-                lhs,
-                builtin: BuiltinKind::Add,
-            })
-        }
-        pub fn lt(lhs: usize) -> Inst {
-            Inst::new(InstKind::CallBuiltin {
-                lhs,
-                builtin: BuiltinKind::Lt,
-            })
-        }
-        pub fn puts(dummy_lhs: usize) -> Inst {
-            Inst::new(InstKind::CallBuiltin {
-                lhs: dummy_lhs,
-                builtin: BuiltinKind::Puts,
-            })
-        }
-        pub fn puti(dummy_lhs: usize) -> Inst {
-            Inst::new(InstKind::CallBuiltin {
-                lhs: dummy_lhs,
-                builtin: BuiltinKind::Puti,
-            })
+        pub fn call(lhs: usize, callee: usize) -> Inst {
+            Inst::new(InstKind::Call_ { lhs, callee })
         }
     }
 }

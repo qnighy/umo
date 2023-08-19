@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::cctx::CCtx;
 use crate::sir::{BasicBlock, BuiltinKind, Function, InstKind, Literal, ProgramUnit};
 
@@ -16,6 +18,14 @@ impl TyCtx {
         };
         self.ty_vars.push(None);
         ty
+    }
+    fn expand_shallow<'a>(&self, ty: &'a Type) -> Cow<'a, Type> {
+        if let Type::Var { var_id: id } = ty {
+            if let Some(ty) = &self.ty_vars[*id] {
+                return Cow::Owned(self.expand_shallow(ty).into_owned());
+            }
+        }
+        Cow::Borrowed(ty)
     }
     fn unify(&mut self, ty1: &Type, ty2: &Type) -> Result<(), TypeError> {
         if let Type::Var { var_id: id } = ty1 {
@@ -50,6 +60,24 @@ impl TyCtx {
             (Type::String, Type::String) => Ok(()),
             (Type::Integer, Type::Integer) => Ok(()),
             (Type::Bool, Type::Bool) => Ok(()),
+            (
+                Type::Function {
+                    args: args1,
+                    ret: ret1,
+                },
+                Type::Function {
+                    args: args2,
+                    ret: ret2,
+                },
+            ) => {
+                if args1.len() != args2.len() {
+                    return Err(TypeError);
+                }
+                for (arg1, arg2) in args1.iter().zip(args2) {
+                    self.unify(arg1, arg2)?;
+                }
+                self.unify(ret1, ret2)
+            }
             _ => Err(TypeError),
         }
     }
@@ -68,6 +96,10 @@ impl TyCtx {
             Type::String => false,
             Type::Integer => false,
             Type::Bool => false,
+            Type::Function { args, ret } => {
+                args.iter().any(|arg| self.has_ty_var(arg, needle_id))
+                    || self.has_ty_var(ret, needle_id)
+            }
         }
     }
     #[allow(unused)] // TODO: remove it later
@@ -84,6 +116,9 @@ impl TyCtx {
             Type::String => false,
             Type::Integer => false,
             Type::Bool => false,
+            Type::Function { args, ret } => {
+                args.iter().any(|arg| self.has_any_ty_var(arg)) || self.has_any_ty_var(ret)
+            }
         }
     }
 }
@@ -194,23 +229,40 @@ fn typecheck_bb(
             InstKind::Literal { lhs, value } => {
                 ty_ctx.unify(&state.vars[*lhs], &Type::of_literal(value))?;
             }
+            InstKind::Closure { lhs, function_id } => {
+                if !args.is_empty() {
+                    todo!("Variable-capturing closure");
+                }
+                let function_type = &pctx.functions[*function_id];
+                ty_ctx.unify(
+                    &state.vars[*lhs],
+                    &Type::Function {
+                        args: function_type.args.clone(),
+                        ret: Box::new(function_type.ret.clone()),
+                    },
+                )?;
+            }
+            InstKind::Builtin { lhs, builtin } => {
+                ty_ctx.unify(&state.vars[*lhs], &builtin_type(*builtin))?;
+            }
             InstKind::PushArg { value_ref } => {
                 args.push(state.vars[*value_ref].clone());
             }
-            InstKind::Call { lhs, callee } => {
-                let args = std::mem::replace(&mut args, vec![]);
-                if args.len() != pctx.functions[*callee].args.len() {
+            InstKind::Call_ { lhs, callee } => {
+                let callee_type = &state.vars[*callee];
+                let (callee_args, callee_ret) =
+                    match ty_ctx.expand_shallow(callee_type).into_owned() {
+                        Type::Function { args, ret } => (args, ret),
+                        _ => return Err(TypeError),
+                    };
+                if args.len() != callee_args.len() {
                     return Err(TypeError);
                 }
-                for (arg_type, param_type) in args.iter().zip(&pctx.functions[*callee].args) {
-                    ty_ctx.unify(arg_type, param_type)?;
+                for (arg, callee_arg) in args.iter().zip(callee_args) {
+                    ty_ctx.unify(arg, &callee_arg)?;
                 }
-                ty_ctx.unify(&state.vars[*lhs], &pctx.functions[*callee].ret)?;
-            }
-            InstKind::CallBuiltin { lhs, builtin: f } => {
-                let args = std::mem::replace(&mut args, vec![]);
-                let return_type = typecheck_builtin(cctx, ty_ctx, *f, args)?;
-                ty_ctx.unify(&state.vars[*lhs], &return_type)?;
+                ty_ctx.unify(&state.vars[*lhs], &callee_ret)?;
+                args.clear();
             }
         }
     }
@@ -220,43 +272,24 @@ fn typecheck_bb(
     Ok(())
 }
 
-fn typecheck_builtin(
-    _cctx: &CCtx,
-    ty_ctx: &mut TyCtx,
-    f: BuiltinKind,
-    args: Vec<Type>,
-) -> Result<Type, TypeError> {
+fn builtin_type(f: BuiltinKind) -> Type {
     match f {
-        BuiltinKind::Add => {
-            if args.len() != 2 {
-                return Err(TypeError);
-            }
-            ty_ctx.unify(&args[0], &Type::Integer)?;
-            ty_ctx.unify(&args[1], &Type::Integer)?;
-            Ok(Type::Integer)
-        }
-        BuiltinKind::Lt => {
-            if args.len() != 2 {
-                return Err(TypeError);
-            }
-            ty_ctx.unify(&args[0], &Type::Integer)?;
-            ty_ctx.unify(&args[1], &Type::Integer)?;
-            Ok(Type::Bool)
-        }
-        BuiltinKind::Puts => {
-            if args.len() != 1 {
-                return Err(TypeError);
-            }
-            ty_ctx.unify(&args[0], &Type::String)?;
-            Ok(Type::Unit)
-        }
-        BuiltinKind::Puti => {
-            if args.len() != 1 {
-                return Err(TypeError);
-            }
-            ty_ctx.unify(&args[0], &Type::Integer)?;
-            Ok(Type::Unit)
-        }
+        BuiltinKind::Add => Type::Function {
+            args: vec![Type::Integer, Type::Integer],
+            ret: Box::new(Type::Integer),
+        },
+        BuiltinKind::Lt => Type::Function {
+            args: vec![Type::Integer, Type::Integer],
+            ret: Box::new(Type::Bool),
+        },
+        BuiltinKind::Puts => Type::Function {
+            args: vec![Type::String],
+            ret: Box::new(Type::Unit),
+        },
+        BuiltinKind::Puti => Type::Function {
+            args: vec![Type::Integer],
+            ret: Box::new(Type::Unit),
+        },
     }
 }
 
@@ -266,6 +299,7 @@ enum Type {
     String,
     Integer,
     Bool,
+    Function { args: Vec<Type>, ret: Box<Type> },
     Var { var_id: usize },
 }
 
@@ -289,28 +323,32 @@ mod tests {
     #[test]
     fn test_typecheck_success() {
         let cctx = CCtx::new();
-        let program_unit =
-            ProgramUnit::simple(Function::describe(0, |desc, (x, tmp1, tmp2), (entry,)| {
+        let program_unit = ProgramUnit::simple(Function::describe(
+            0,
+            |desc, (x, tmp1, puti1, tmp2), (entry,)| {
                 desc.block(
                     entry,
                     vec![
+                        insts::builtin(puti1, BuiltinKind::Puti),
                         insts::integer_literal(x, 42),
                         insts::push_arg(x),
-                        insts::puti(tmp2),
+                        insts::call(tmp2, puti1),
                         insts::unit_literal(tmp1),
                         insts::return_(tmp1),
                     ],
                 );
-            }));
+            },
+        ));
         assert!(typecheck(&cctx, &program_unit).is_ok());
     }
 
     #[test]
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(tmp1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(tmp1, puti1, tmp2)| {
             vec![
-                insts::puti(tmp2),
+                insts::builtin(puti1, BuiltinKind::Puti),
+                insts::call(tmp2, puti1),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]
@@ -321,12 +359,13 @@ mod tests {
     #[test]
     fn test_typecheck_failure_too_many_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, puti1, tmp2)| {
             vec![
                 insts::integer_literal(x, 42),
+                insts::builtin(puti1, BuiltinKind::Puti),
                 insts::push_arg(x),
                 insts::push_arg(x),
-                insts::puti(tmp2),
+                insts::call(tmp2, puti1),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]
@@ -337,11 +376,12 @@ mod tests {
     #[test]
     fn test_typecheck_failure_arg_type_mismatch() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, puti1, tmp2)| {
             vec![
                 insts::string_literal(x, "Hello, world!"),
+                insts::builtin(puti1, BuiltinKind::Puti),
                 insts::push_arg(x),
-                insts::puti(tmp2),
+                insts::call(tmp2, puti1),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]

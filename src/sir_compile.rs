@@ -94,14 +94,19 @@ fn liveness_bb(
             InstKind::Literal { lhs, .. } => {
                 alive.remove(*lhs);
             }
+            InstKind::Closure { lhs, function_id } => {
+                alive.remove(*lhs);
+                alive.insert(*function_id);
+            }
+            InstKind::Builtin { lhs, builtin: _ } => {
+                alive.remove(*lhs);
+            }
             InstKind::PushArg { value_ref } => {
                 alive.insert(*value_ref);
             }
-            InstKind::Call { lhs, .. } => {
+            InstKind::Call_ { lhs, callee } => {
                 alive.remove(*lhs);
-            }
-            InstKind::CallBuiltin { lhs, .. } => {
-                alive.remove(*lhs);
+                alive.insert(*callee);
             }
         }
         *updated = *updated
@@ -212,9 +217,13 @@ fn moved_rhs_of(inst: &Inst) -> Option<usize> {
         InstKind::Copy { .. } => None,
         InstKind::Drop { rhs } => Some(*rhs),
         InstKind::Literal { .. } => None,
+        InstKind::Closure {
+            lhs: _,
+            function_id: _,
+        } => None,
+        InstKind::Builtin { lhs: _, builtin: _ } => None,
         InstKind::PushArg { value_ref } => Some(*value_ref),
-        InstKind::Call { .. } => None,
-        InstKind::CallBuiltin { .. } => None,
+        InstKind::Call_ { lhs: _, callee } => Some(*callee),
     }
 }
 
@@ -238,14 +247,17 @@ fn replace_moved_rhs(inst: &mut Inst, to: usize) {
         InstKind::Literal { .. } => {
             unreachable!();
         }
+        InstKind::Closure { .. } => {
+            unreachable!();
+        }
+        InstKind::Builtin { .. } => {
+            unreachable!();
+        }
         InstKind::PushArg { value_ref } => {
             *value_ref = to;
         }
-        InstKind::Call { .. } => {
-            unreachable!();
-        }
-        InstKind::CallBuiltin { .. } => {
-            unreachable!();
+        InstKind::Call_ { callee, .. } => {
+            *callee = to;
         }
     }
 }
@@ -258,31 +270,38 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
         InstKind::Copy { lhs, .. } => Some(*lhs),
         InstKind::Drop { .. } => None,
         InstKind::Literal { lhs, .. } => Some(*lhs),
+        InstKind::Closure { lhs, .. } => Some(*lhs),
+        InstKind::Builtin { lhs, .. } => Some(*lhs),
         InstKind::PushArg { .. } => None,
-        InstKind::Call { lhs, .. } => Some(*lhs),
-        InstKind::CallBuiltin { lhs, .. } => Some(*lhs),
+        InstKind::Call_ { lhs, .. } => Some(*lhs),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::sir::testing::{insts, FunctionTestingExt, ProgramUnitTestingExt};
+    use crate::sir::{
+        testing::{insts, FunctionTestingExt, ProgramUnitTestingExt},
+        BuiltinKind,
+    };
 
     use super::*;
 
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
             vec![
                 insts::string_literal(x, "Hello, world!"),
+                insts::builtin(puts1, BuiltinKind::Puts),
                 insts::push_arg(x),
-                insts::puts(tmp2),
+                insts::call(tmp2, puts1),
+                insts::builtin(puts1, BuiltinKind::Puts),
                 insts::push_arg(x),
-                insts::puts(tmp2),
+                insts::call(tmp2, puts1),
                 insts::string_literal(x, "Hello, world!"),
+                insts::builtin(puts1, BuiltinKind::Puts),
                 insts::push_arg(x),
-                insts::puts(tmp2),
+                insts::call(tmp2, puts1),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]
@@ -290,19 +309,22 @@ mod tests {
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2, tmp3)| {
+            ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2, tmp3)| {
                 vec![
                     insts::string_literal(x, "Hello, world!"),
+                    insts::builtin(puts1, BuiltinKind::Puts),
                     insts::copy(tmp3, x),
                     insts::push_arg(tmp3),
-                    insts::puts(tmp2),
+                    insts::call(tmp2, puts1),
                     insts::drop(tmp2),
+                    insts::builtin(puts1, BuiltinKind::Puts),
                     insts::push_arg(x),
-                    insts::puts(tmp2),
+                    insts::call(tmp2, puts1),
                     insts::drop(tmp2),
                     insts::string_literal(x, "Hello, world!"),
+                    insts::builtin(puts1, BuiltinKind::Puts),
                     insts::push_arg(x),
-                    insts::puts(tmp2),
+                    insts::call(tmp2, puts1),
                     insts::drop(tmp2),
                     insts::unit_literal(tmp1),
                     insts::return_(tmp1),
@@ -314,12 +336,13 @@ mod tests {
     #[test]
     fn test_compile_drop() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
             vec![
                 insts::string_literal(x, "dummy"),
                 insts::string_literal(x, "Hello, world!"),
+                insts::builtin(puts1, BuiltinKind::Puts),
                 insts::push_arg(x),
-                insts::puts(tmp2),
+                insts::call(tmp2, puts1),
                 insts::unit_literal(tmp1),
                 insts::return_(tmp1),
             ]
@@ -327,13 +350,14 @@ mod tests {
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
+            ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
                 vec![
                     insts::string_literal(x, "dummy"),
                     insts::drop(x),
                     insts::string_literal(x, "Hello, world!"),
+                    insts::builtin(puts1, BuiltinKind::Puts),
                     insts::push_arg(x),
-                    insts::puts(tmp2),
+                    insts::call(tmp2, puts1),
                     insts::drop(tmp2),
                     insts::unit_literal(tmp1),
                     insts::return_(tmp1),

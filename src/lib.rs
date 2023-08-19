@@ -21,22 +21,23 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
                 0,
-                3,
+                4,
                 vec![sir::BasicBlock::new(vec![
-                    sir::Inst::new(sir::InstKind::Literal {
+                    sir::Inst::new(sir::InstKind::Builtin {
                         lhs: 0,
-                        value: sir::Literal::String(Arc::new("Hello, world!".to_string())),
-                    }),
-                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
-                    sir::Inst::new(sir::InstKind::CallBuiltin {
-                        lhs: 2,
                         builtin: sir::BuiltinKind::Puts,
                     }),
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 1,
+                        value: sir::Literal::String(Arc::new("Hello, world!".to_string())),
+                    }),
+                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 1 }),
+                    sir::Inst::new(sir::InstKind::Call_ { lhs: 3, callee: 0 }),
+                    sir::Inst::new(sir::InstKind::Literal {
+                        lhs: 2,
                         value: sir::Literal::Unit,
                     }),
-                    sir::Inst::new(sir::InstKind::Return { rhs: 1 }),
+                    sir::Inst::new(sir::InstKind::Return { rhs: 2 }),
                 ])],
             )]),
         );
@@ -45,32 +46,34 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
                 0,
-                5,
+                7,
                 vec![sir::BasicBlock::new(vec![
-                    sir::Inst::new(sir::InstKind::Literal {
+                    sir::Inst::new(sir::InstKind::Builtin {
                         lhs: 0,
-                        value: sir::Literal::Integer(1),
+                        builtin: sir::BuiltinKind::Puti,
                     }),
-                    sir::Inst::new(sir::InstKind::Literal {
+                    sir::Inst::new(sir::InstKind::Builtin {
                         lhs: 1,
-                        value: sir::Literal::Integer(1),
-                    }),
-                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 0 }),
-                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 1 }),
-                    sir::Inst::new(sir::InstKind::CallBuiltin {
-                        lhs: 2,
                         builtin: sir::BuiltinKind::Add,
                     }),
-                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 2 }),
-                    sir::Inst::new(sir::InstKind::CallBuiltin {
-                        lhs: 4,
-                        builtin: sir::BuiltinKind::Puti,
+                    sir::Inst::new(sir::InstKind::Literal {
+                        lhs: 2,
+                        value: sir::Literal::Integer(1),
                     }),
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 3,
+                        value: sir::Literal::Integer(1),
+                    }),
+                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 2 }),
+                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 3 }),
+                    sir::Inst::new(sir::InstKind::Call_ { lhs: 4, callee: 2 }),
+                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 4 }),
+                    sir::Inst::new(sir::InstKind::Call_ { lhs: 6, callee: 0 }),
+                    sir::Inst::new(sir::InstKind::Literal {
+                        lhs: 5,
                         value: sir::Literal::Unit,
                     }),
-                    sir::Inst::new(sir::InstKind::Return { rhs: 3 }),
+                    sir::Inst::new(sir::InstKind::Return { rhs: 5 }),
                 ])],
             )]),
         );

@@ -17,7 +17,7 @@ mod tests {
     use super::*;
 
     use crate::sir::testing::{insts, FunctionTestingExt, ProgramUnitTestingExt};
-    use crate::sir::Function;
+    use crate::sir::{BuiltinKind, Function};
     use crate::testing::MockRtCtx;
 
     #[test]
@@ -25,11 +25,12 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::simple(0, |(x, tmp1, tmp2)| {
+            &ProgramUnit::simple(Function::simple(0, |(x, tmp1, puts1, tmp2)| {
                 vec![
                     insts::string_literal(x, "Hello, world!"),
+                    insts::builtin(puts1, BuiltinKind::Puts),
                     insts::push_arg(x),
-                    insts::puts(tmp2),
+                    insts::call(tmp2, puts1),
                     insts::unit_literal(tmp1),
                     insts::return_(tmp1),
                 ]
@@ -45,7 +46,7 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::describe(
                 0,
-                |desc, (x, tmp1, tmp2), (entry, label1)| {
+                |desc, (x, tmp1, puts1, tmp2), (entry, label1)| {
                     desc.block(
                         entry,
                         vec![
@@ -56,8 +57,9 @@ mod tests {
                     desc.block(
                         label1,
                         vec![
+                            insts::builtin(puts1, BuiltinKind::Puts),
                             insts::push_arg(x),
-                            insts::puts(tmp2),
+                            insts::call(tmp2, puts1),
                             insts::unit_literal(tmp1),
                             insts::return_(tmp1),
                         ],
@@ -73,19 +75,24 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::simple(0, |(tmp1, tmp2, x, tmp3, tmp4)| {
-                vec![
-                    insts::integer_literal(tmp1, 1),
-                    insts::integer_literal(tmp2, 1),
-                    insts::push_arg(tmp1),
-                    insts::push_arg(tmp2),
-                    insts::add(x),
-                    insts::push_arg(x),
-                    insts::puti(tmp4),
-                    insts::unit_literal(tmp3),
-                    insts::return_(tmp3),
-                ]
-            })),
+            &ProgramUnit::simple(Function::simple(
+                0,
+                |(tmp1, tmp2, x, add1, tmp3, puti1, tmp4)| {
+                    vec![
+                        insts::integer_literal(tmp1, 1),
+                        insts::integer_literal(tmp2, 1),
+                        insts::builtin(add1, BuiltinKind::Add),
+                        insts::push_arg(tmp1),
+                        insts::push_arg(tmp2),
+                        insts::call(x, add1),
+                        insts::builtin(puti1, BuiltinKind::Puti),
+                        insts::push_arg(x),
+                        insts::call(tmp4, puti1),
+                        insts::unit_literal(tmp3),
+                        insts::return_(tmp3),
+                    ]
+                },
+            )),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "2\n");
     }
@@ -97,7 +104,7 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::describe(
                 0,
-                |desc, (x, s, tmp1, tmp2), (entry, branch_then, branch_else)| {
+                |desc, (x, s, tmp1, puts1, tmp2), (entry, branch_then, branch_else)| {
                     desc.block(
                         entry,
                         vec![
@@ -109,8 +116,9 @@ mod tests {
                         branch_then,
                         vec![
                             insts::string_literal(s, "x is true"),
+                            insts::builtin(puts1, BuiltinKind::Puts),
                             insts::push_arg(s),
-                            insts::puts(tmp2),
+                            insts::call(tmp2, puts1),
                             insts::unit_literal(tmp1),
                             insts::return_(tmp1),
                         ],
@@ -119,8 +127,9 @@ mod tests {
                         branch_else,
                         vec![
                             insts::string_literal(s, "x is false"),
+                            insts::builtin(puts1, BuiltinKind::Puts),
                             insts::push_arg(s),
-                            insts::puts(tmp2),
+                            insts::call(tmp2, puts1),
                             insts::unit_literal(tmp1),
                             insts::return_(tmp1),
                         ],
@@ -138,7 +147,7 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::describe(
                 0,
-                |desc, (x, s, tmp1, tmp2), (entry, branch_then, branch_else)| {
+                |desc, (x, s, tmp1, puts1, tmp2), (entry, branch_then, branch_else)| {
                     desc.block(
                         entry,
                         vec![
@@ -150,8 +159,9 @@ mod tests {
                         branch_then,
                         vec![
                             insts::string_literal(s, "x is true"),
+                            insts::builtin(puts1, BuiltinKind::Puts),
                             insts::push_arg(s),
-                            insts::puts(tmp2),
+                            insts::call(tmp2, puts1),
                             insts::unit_literal(tmp1),
                             insts::return_(tmp1),
                         ],
@@ -160,8 +170,9 @@ mod tests {
                         branch_else,
                         vec![
                             insts::string_literal(s, "x is false"),
+                            insts::builtin(puts1, BuiltinKind::Puts),
                             insts::push_arg(s),
-                            insts::puts(tmp2),
+                            insts::call(tmp2, puts1),
                             insts::unit_literal(tmp1),
                             insts::return_(tmp1),
                         ],
@@ -187,7 +198,9 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::describe(
                 0,
-                |desc, (sum, i, tmp1, tmp2, tmp3, tmp4, tmp5), (entry, cond, body, end)| {
+                |desc,
+                 (sum, i, tmp1, lt1, add1, puti1, tmp2, tmp3, tmp4, tmp5),
+                 (entry, cond, body, end)| {
                     desc.block(
                         entry,
                         vec![
@@ -205,9 +218,10 @@ mod tests {
                             // tmp1 = 10;
                             insts::integer_literal(tmp1, 10),
                             // tmp2 = i < tmp1;
+                            insts::builtin(lt1, BuiltinKind::Lt),
                             insts::push_arg(i),
                             insts::push_arg(tmp1),
-                            insts::lt(tmp2),
+                            insts::call(tmp2, lt1),
                             // if tmp2 { goto body; } else { goto end; };
                             insts::branch(tmp2, body, end),
                         ],
@@ -216,14 +230,16 @@ mod tests {
                         body,
                         vec![
                             // sum = sum + i;
+                            insts::builtin(add1, BuiltinKind::Add),
                             insts::push_arg(sum),
                             insts::push_arg(i),
-                            insts::add(sum),
+                            insts::call(sum, add1),
                             // i = i + 1;
                             insts::integer_literal(tmp3, 1),
+                            insts::builtin(add1, BuiltinKind::Add),
                             insts::push_arg(i),
                             insts::push_arg(tmp3),
-                            insts::add(i),
+                            insts::call(i, add1),
                             // goto cond;
                             insts::jump(cond),
                         ],
@@ -232,8 +248,9 @@ mod tests {
                         end,
                         vec![
                             // puti(sum);
+                            insts::builtin(puti1, BuiltinKind::Puti),
                             insts::push_arg(sum),
-                            insts::puti(tmp5),
+                            insts::call(tmp5, puti1),
                             // return;
                             insts::unit_literal(tmp4),
                             insts::return_(tmp4),
@@ -262,16 +279,18 @@ mod tests {
             &ProgramUnit::describe(|p, (entry, fib)| {
                 p.function(
                     entry,
-                    Function::simple(0, |(tmp1, tmp2, tmp3, tmp4)| {
+                    Function::simple(0, |(tmp1, fib1, tmp2, tmp3, puti1, tmp4)| {
                         vec![
                             // tmp1 = 10;
                             insts::integer_literal(tmp1, 10),
                             // tmp2 = fib(tmp1);
+                            insts::closure(fib1, fib),
                             insts::push_arg(tmp1),
-                            insts::call(tmp2, fib),
+                            insts::call(tmp2, fib1),
                             // puti(tmp2);
+                            insts::builtin(puti1, BuiltinKind::Puti),
                             insts::push_arg(tmp2),
-                            insts::puti(tmp4),
+                            insts::call(tmp4, puti1),
                             // return;
                             insts::unit_literal(tmp3),
                             insts::return_(tmp3),
@@ -283,16 +302,31 @@ mod tests {
                     Function::describe(
                         1,
                         |desc,
-                         (n, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8, tmp9),
+                         (
+                            n,
+                            tmp1,
+                            lt1,
+                            tmp2,
+                            tmp3,
+                            tmp4,
+                            add1,
+                            tmp5,
+                            fib1,
+                            tmp6,
+                            tmp7,
+                            tmp8,
+                            tmp9,
+                        ),
                          (entry, branch_then, branch_else)| {
                             desc.block(
                                 entry,
                                 vec![
                                     // tmp1 = n < 2;
                                     insts::integer_literal(tmp2, 2),
+                                    insts::builtin(lt1, BuiltinKind::Lt),
                                     insts::push_arg(n),
                                     insts::push_arg(tmp2),
-                                    insts::lt(tmp1),
+                                    insts::call(tmp1, lt1),
                                     // if tmp1 { goto branch_then; } else { goto branch_else; };
                                     insts::branch(tmp1, branch_then, branch_else),
                                 ],
@@ -309,24 +343,29 @@ mod tests {
                                 vec![
                                     // tmp4 = n - 1;
                                     insts::integer_literal(tmp5, -1),
+                                    insts::builtin(add1, BuiltinKind::Add),
                                     insts::push_arg(n),
                                     insts::push_arg(tmp5),
-                                    insts::add(tmp4),
+                                    insts::call(tmp4, add1),
                                     // tmp6 = fib(tmp4);
+                                    insts::closure(fib1, fib),
                                     insts::push_arg(tmp4),
-                                    insts::call(tmp6, fib),
+                                    insts::call(tmp6, fib1),
                                     // tmp7 = n - 2;
                                     insts::integer_literal(tmp8, -2),
+                                    insts::builtin(add1, BuiltinKind::Add),
                                     insts::push_arg(n),
                                     insts::push_arg(tmp8),
-                                    insts::add(tmp7),
+                                    insts::call(tmp7, add1),
                                     // tmp9 = fib(tmp7);
+                                    insts::closure(fib1, fib),
                                     insts::push_arg(tmp7),
-                                    insts::call(tmp9, fib),
+                                    insts::call(tmp9, fib1),
                                     // tmp3 = tmp6 + tmp9;
+                                    insts::builtin(add1, BuiltinKind::Add),
                                     insts::push_arg(tmp6),
                                     insts::push_arg(tmp9),
-                                    insts::add(tmp3),
+                                    insts::call(tmp3, add1),
                                     // return tmp3;
                                     insts::return_(tmp3),
                                 ],

@@ -81,19 +81,34 @@ fn eval1_bb(
             InstKind::Literal { lhs, value } => {
                 state.vars[*lhs] = Some(Value::from(value.clone()));
             }
+            InstKind::Closure { lhs, function_id } => {
+                state.vars[*lhs] = Some(Value::Closure {
+                    function_id: *function_id,
+                });
+            }
+            InstKind::Builtin { lhs, builtin } => {
+                state.vars[*lhs] = Some(Value::Builtin(*builtin));
+            }
             InstKind::PushArg { value_ref } => {
                 let value = state.vars[*value_ref].take().unwrap();
                 state.args.push(value);
             }
-            InstKind::Call { lhs, callee } => {
+            InstKind::Call_ {
+                lhs,
+                callee: callee_rhs,
+            } => {
+                let callee = state.vars[*callee_rhs].take().unwrap();
                 let args = mem::replace(&mut state.args, vec![]);
-                let return_value =
-                    eval1_function(ctx, program_unit, &program_unit.functions[*callee], args);
-                state.vars[*lhs] = Some(return_value);
-            }
-            InstKind::CallBuiltin { lhs, builtin: f } => {
-                let args = mem::replace(&mut state.args, vec![]);
-                let return_value = eval_builtin(ctx, *f, args);
+                let return_value = match callee {
+                    Value::Closure { function_id } => eval1_function(
+                        ctx,
+                        program_unit,
+                        &program_unit.functions[function_id],
+                        args,
+                    ),
+                    Value::Builtin(f) => eval_builtin(ctx, f, args),
+                    _ => panic!("Expected closure or builtin"),
+                };
                 state.vars[*lhs] = Some(return_value);
             }
         }
@@ -148,6 +163,11 @@ fn eval_builtin(ctx: &dyn RtCtx, f: BuiltinKind, args: Vec<Value>) -> Value {
 enum Value {
     String(Arc<String>),
     Integer(i32),
+    Builtin(BuiltinKind),
+    Closure {
+        function_id: usize,
+        // captured_vars: Vec<Value>,
+    },
 }
 
 impl From<Literal> for Value {

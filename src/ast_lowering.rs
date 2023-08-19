@@ -108,11 +108,22 @@ fn lower_stmt(fctx: &mut FunctionContext<'_>, stmt: &Stmt, result_var: Option<us
 fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
     match expr {
         Expr::Var { name: _, id } => {
-            let var_id = fctx.var_id_map[id];
-            fctx.push(sir::Inst::new(sir::InstKind::Copy {
-                lhs: result_var,
-                rhs: var_id,
-            }));
+            let builtin = fctx.builtin_ids.builtins.get(id).copied();
+            if let Some(builtin) = builtin {
+                fctx.push(sir::Inst::new(sir::InstKind::Builtin {
+                    lhs: result_var,
+                    builtin: match builtin {
+                        BuiltinKind::Puts => sir::BuiltinKind::Puts,
+                        BuiltinKind::Puti => sir::BuiltinKind::Puti,
+                    },
+                }));
+            } else {
+                let var_id = fctx.var_id_map[id];
+                fctx.push(sir::Inst::new(sir::InstKind::Copy {
+                    lhs: result_var,
+                    rhs: var_id,
+                }));
+            }
         }
         Expr::Branch { cond, then, else_ } => {
             let cond_var = lower_expr2(fctx, cond);
@@ -183,31 +194,20 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
             }));
         }
         Expr::Call { callee, args } => {
-            let builtin = if let Expr::Var { name: _, id } = &**callee {
-                fctx.builtin_ids.builtins.get(id).copied()
-            } else {
-                None
-            };
-            if let Some(builtin) = builtin {
-                let arg_vars = args
-                    .iter()
-                    .map(|arg| lower_expr2(fctx, arg))
-                    .collect::<Vec<_>>();
-                for &arg_var in &arg_vars {
-                    fctx.push(sir::Inst::new(sir::InstKind::PushArg {
-                        value_ref: arg_var,
-                    }));
-                }
-                fctx.push(sir::Inst::new(sir::InstKind::CallBuiltin {
-                    lhs: result_var,
-                    builtin: match builtin {
-                        BuiltinKind::Puts => sir::BuiltinKind::Puts,
-                        BuiltinKind::Puti => sir::BuiltinKind::Puti,
-                    },
+            let callee_var = lower_expr2(fctx, callee);
+            let arg_vars = args
+                .iter()
+                .map(|arg| lower_expr2(fctx, arg))
+                .collect::<Vec<_>>();
+            for &arg_var in &arg_vars {
+                fctx.push(sir::Inst::new(sir::InstKind::PushArg {
+                    value_ref: arg_var,
                 }));
-            } else {
-                todo!("non-builtin call");
             }
+            fctx.push(sir::Inst::new(sir::InstKind::Call_ {
+                lhs: result_var,
+                callee: callee_var,
+            }));
         }
         Expr::IntegerLiteral { value } => {
             fctx.push(sir::Inst::new(sir::InstKind::Literal {
@@ -216,6 +216,15 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
             }));
         }
         Expr::BinOp { op, lhs, rhs } => {
+            let callee_var = fctx.fresh_var();
+            fctx.push(sir::Inst::new(sir::InstKind::Builtin {
+                lhs: callee_var,
+                builtin: match op {
+                    BinOp::Add => sir::BuiltinKind::Add,
+                    BinOp::Lt => sir::BuiltinKind::Lt,
+                },
+            }));
+
             let lhs_var = lower_expr2(fctx, lhs);
             let rhs_var = lower_expr2(fctx, rhs);
 
@@ -225,12 +234,9 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
             fctx.push(sir::Inst::new(sir::InstKind::PushArg {
                 value_ref: rhs_var,
             }));
-            fctx.push(sir::Inst::new(sir::InstKind::CallBuiltin {
+            fctx.push(sir::Inst::new(sir::InstKind::Call_ {
                 lhs: result_var,
-                builtin: match op {
-                    BinOp::Add => sir::BuiltinKind::Add,
-                    BinOp::Lt => sir::BuiltinKind::Lt,
-                },
+                callee: callee_var,
             }));
         }
     }
@@ -325,15 +331,16 @@ mod tests {
         let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
-            sir::Function::describe(0, |desc, (tmp1, tmp2, tmp3), (entry,)| {
+            sir::Function::describe(0, |desc, (tmp1, add1, tmp2, tmp3), (entry,)| {
                 desc.block(
                     entry,
                     vec![
+                        insts::builtin(add1, sir::BuiltinKind::Add),
                         insts::integer_literal(tmp2, 1),
                         insts::integer_literal(tmp3, 2),
                         insts::push_arg(tmp2),
                         insts::push_arg(tmp3),
-                        insts::add(tmp1),
+                        insts::call(tmp1, add1),
                         insts::return_(tmp1),
                     ],
                 );
@@ -436,7 +443,7 @@ mod tests {
             function,
             sir::Function::describe(
                 0,
-                |desc, (x, tmp1, tmp2, tmp3, tmp4, tmp5), (entry, cond, body, cont)| {
+                |desc, (x, tmp1, lt1, tmp2, tmp3, add1, tmp4, tmp5), (entry, cond, body, cont)| {
                     desc.block(
                         entry,
                         vec![insts::integer_literal(x, 42), insts::jump(cond)],
@@ -444,22 +451,24 @@ mod tests {
                     desc.block(
                         cond,
                         vec![
+                            insts::builtin(lt1, sir::BuiltinKind::Lt),
                             insts::integer_literal(tmp2, -1),
                             insts::copy(tmp3, x),
                             insts::push_arg(tmp2),
                             insts::push_arg(tmp3),
-                            insts::lt(tmp1),
+                            insts::call(tmp1, lt1),
                             insts::branch(tmp1, body, cont),
                         ],
                     );
                     desc.block(
                         body,
                         vec![
+                            insts::builtin(add1, sir::BuiltinKind::Add),
                             insts::copy(tmp4, x),
                             insts::integer_literal(tmp5, -1),
                             insts::push_arg(tmp4),
                             insts::push_arg(tmp5),
-                            insts::add(x),
+                            insts::call(x, add1),
                             insts::unit_literal(tmp1),
                             insts::jump(cond),
                         ],
@@ -485,13 +494,14 @@ mod tests {
         let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
-            sir::Function::describe(0, |desc, (_tmp1, tmp2, tmp3), (entry,)| {
+            sir::Function::describe(0, |desc, (_tmp1, tmp2, puti1, tmp3), (entry,)| {
                 desc.block(
                     entry,
                     vec![
+                        insts::builtin(puti1, sir::BuiltinKind::Puti),
                         insts::integer_literal(tmp3, 42),
                         insts::push_arg(tmp3),
-                        insts::puti(tmp2),
+                        insts::call(tmp2, puti1),
                         insts::return_(tmp2),
                     ],
                 );
