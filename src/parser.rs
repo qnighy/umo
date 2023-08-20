@@ -1,4 +1,4 @@
-use crate::ast::Expr;
+use crate::ast::{Expr, Stmt};
 use crate::cctx::Id;
 
 #[derive(Debug)]
@@ -22,6 +22,65 @@ impl Parser {
             buf: source.as_bytes().to_vec(),
             pos: 0,
             next_token_cache: None,
+        }
+    }
+    fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
+        let tok = self.next_token()?;
+        match tok.kind {
+            TokenKind::KeywordLet => {
+                self.bump();
+                let id_token = self.next_token()?;
+                let name = match id_token.kind {
+                    TokenKind::Identifier => {
+                        self.bump();
+                        std::str::from_utf8(&self.buf[id_token.begin..id_token.end])
+                            .unwrap()
+                            .to_owned()
+                    }
+                    _ => return Err(ParseError),
+                };
+                let tok = self.next_token()?;
+                if tok.kind != TokenKind::Equal {
+                    return Err(ParseError);
+                }
+                self.bump();
+                let init = self.parse_expr()?;
+                let tok = self.next_token()?;
+                if tok.kind != TokenKind::Semicolon {
+                    return Err(ParseError);
+                }
+                self.bump();
+                Ok(Stmt::Let {
+                    name,
+                    id: Id::dummy(),
+                    init,
+                })
+            }
+            TokenKind::KeywordThen => {
+                self.bump();
+                let expr = self.parse_expr()?;
+                let tok = self.next_token()?;
+                if tok.kind != TokenKind::Semicolon {
+                    return Err(ParseError);
+                }
+                self.bump();
+                Ok(Stmt::Expr {
+                    expr,
+                    use_value: true,
+                })
+            }
+            _ => {
+                let expr = self.parse_expr()?;
+                let tok = self.next_token()?;
+                if tok.kind != TokenKind::Semicolon {
+                    return Err(ParseError);
+                }
+                self.bump();
+                Ok(Stmt::Expr {
+                    expr,
+                    use_value: false,
+                })
+            }
         }
     }
     fn parse_exprs(&mut self) -> Result<Vec<Expr>, ParseError> {
@@ -133,6 +192,14 @@ impl Parser {
                 self.pos += 1;
                 TokenKind::Comma
             }
+            Some(b';') => {
+                self.pos += 1;
+                TokenKind::Semicolon
+            }
+            Some(b'=') => {
+                self.pos += 1;
+                TokenKind::Equal
+            }
             Some(b'a'..=b'z') | Some(b'A'..=b'Z') | Some(b'_') => {
                 while self.pos < self.buf.len()
                     && (self.buf[self.pos].is_ascii_alphanumeric() || self.buf[self.pos] == b'_')
@@ -142,6 +209,8 @@ impl Parser {
                 match &self.buf[begin..self.pos] {
                     // TODO: other reserved identifiers
                     b"true" | b"false" => todo!(),
+                    b"let" => TokenKind::KeywordLet,
+                    b"then" => TokenKind::KeywordThen,
                     _ => TokenKind::Identifier,
                 }
             }
@@ -195,6 +264,10 @@ enum TokenKind {
     LParen,
     RParen,
     Comma,
+    Semicolon,
+    Equal,
+    KeywordLet,
+    KeywordThen,
     Identifier,
     Integer,
     String,
@@ -288,6 +361,40 @@ mod tests {
                         id: Id::dummy(),
                     }
                 ],
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_let_stmt() {
+        assert_eq!(
+            Parser::new("let x = 1;").parse_stmt().unwrap(),
+            Stmt::Let {
+                name: "x".to_string(),
+                id: Id::dummy(),
+                init: Expr::IntegerLiteral { value: 1 },
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_then_stmt() {
+        assert_eq!(
+            Parser::new("then 1;").parse_stmt().unwrap(),
+            Stmt::Expr {
+                expr: Expr::IntegerLiteral { value: 1 },
+                use_value: true,
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_expr_stmt() {
+        assert_eq!(
+            Parser::new("1;").parse_stmt().unwrap(),
+            Stmt::Expr {
+                expr: Expr::IntegerLiteral { value: 1 },
+                use_value: false,
             }
         );
     }
