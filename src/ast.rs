@@ -13,7 +13,10 @@ pub enum Stmt {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     #[allow(unused)] // TODO: remove this annotation later
-    Var { name: String, id: Id },
+    Var {
+        name: String,
+        id: Id,
+    },
     #[allow(unused)] // TODO: remove this annotation later
     Branch {
         cond: Box<Expr>,
@@ -21,9 +24,14 @@ pub enum Expr {
         else_: Box<Expr>,
     },
     #[allow(unused)] // TODO: remove this annotation later
-    While { cond: Box<Expr>, body: Box<Expr> },
+    While {
+        cond: Box<Expr>,
+        body: Box<Expr>,
+    },
     #[allow(unused)] // TODO: remove this annotation later
-    Block { stmts: Vec<Stmt> },
+    Block {
+        stmts: Vec<Stmt>,
+    },
     #[allow(unused)] // TODO: remove this annotation later
     Assign {
         name: String,
@@ -31,10 +39,18 @@ pub enum Expr {
         rhs: Box<Expr>,
     },
     #[allow(unused)] // TODO: remove this annotation later
-    Call { callee: Box<Expr>, args: Vec<Expr> },
+    Call {
+        callee: Box<Expr>,
+        args: Vec<Expr>,
+    },
     #[allow(unused)] // TODO: remove this annotation later
     // TODO: use BigInt
-    IntegerLiteral { value: i32 },
+    IntegerLiteral {
+        value: i32,
+    },
+    StringLiteral {
+        value: String,
+    },
     #[allow(unused)] // TODO: remove this annotation later
     BinOp {
         op: BinOp,
@@ -183,6 +199,7 @@ fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
             }
         }
         Expr::IntegerLiteral { .. } => {}
+        Expr::StringLiteral { .. } => {}
         Expr::BinOp { op: _, lhs, rhs } => {
             assign_id_expr(cctx, scope, lhs);
             assign_id_expr(cctx, scope, rhs);
@@ -264,6 +281,12 @@ pub mod testing {
 
         pub fn integer_literal(value: i32) -> Expr {
             Expr::IntegerLiteral { value }
+        }
+
+        pub fn string_literal(value: &str) -> Expr {
+            Expr::StringLiteral {
+                value: value.to_owned(),
+            }
         }
 
         pub fn add(lhs: Expr, rhs: Expr) -> Expr {

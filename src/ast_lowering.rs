@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::ast::{BinOp, BuiltinIds, BuiltinKind, Expr, Stmt};
 use crate::cctx::Id;
@@ -215,6 +216,12 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
                 value: sir::Literal::Integer(*value),
             }));
         }
+        Expr::StringLiteral { value } => {
+            fctx.push(sir::Inst::new(sir::InstKind::Literal {
+                lhs: result_var,
+                value: sir::Literal::String(Arc::new(value.clone())),
+            }));
+        }
         Expr::BinOp { op, lhs, rhs } => {
             let callee_var = fctx.fresh_var();
             fctx.push(sir::Inst::new(sir::InstKind::Builtin {
@@ -295,6 +302,7 @@ fn collect_vars_expr(expr: &Expr, vars: &mut HashSet<Id>) {
             }
         }
         Expr::IntegerLiteral { value: _ } => {}
+        Expr::StringLiteral { value: _ } => {}
         Expr::BinOp { op: _, lhs, rhs } => {
             collect_vars_expr(lhs, vars);
             collect_vars_expr(rhs, vars);
@@ -314,6 +322,37 @@ mod tests {
         let mut scope = Scope::new(builtin_ids);
         assign_id_stmts(cctx, &mut scope, &mut stmts);
         stmts
+    }
+
+    #[test]
+    fn test_lower_hello() {
+        let mut cctx = CCtx::new();
+        let builtin_ids = BuiltinIds::new(&cctx);
+        let s = assign_id(
+            &mut cctx,
+            &builtin_ids,
+            vec![stmts::expr(exprs::call(
+                exprs::var("puts"),
+                vec![exprs::string_literal("Hello, world!")],
+            ))],
+        );
+        let function = lower(&builtin_ids, &s);
+        assert_eq!(
+            function,
+            sir::Function::describe(0, |desc, (_tmp1, tmp2, tmp3, puts1, tmp4), (entry,)| {
+                desc.block(
+                    entry,
+                    vec![
+                        insts::builtin(puts1, sir::BuiltinKind::Puts),
+                        insts::string_literal(tmp4, "Hello, world!"),
+                        insts::push_arg(tmp4),
+                        insts::call(tmp3, puts1),
+                        insts::unit_literal(tmp2),
+                        insts::return_(tmp2),
+                    ],
+                );
+            })
+        );
     }
 
     #[test]
