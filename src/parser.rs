@@ -4,9 +4,9 @@ use crate::cctx::Id;
 #[derive(Debug)]
 pub struct ParseError;
 
-pub fn parse_expr(source: &str) -> Result<Expr, ParseError> {
+pub fn parse(source: &str) -> Result<Vec<Stmt>, ParseError> {
     let mut parser = Parser::new(source);
-    parser.parse_expr()
+    parser.parse_program()
 }
 
 #[derive(Debug)]
@@ -309,7 +309,7 @@ mod tests {
     #[test]
     fn test_parse_var_ref() {
         assert_eq!(
-            parse_expr("x").unwrap(),
+            Parser::new("x").parse_expr().unwrap(),
             Expr::Var {
                 name: "x".to_string(),
                 id: Id::dummy(),
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_parse_paren() {
         assert_eq!(
-            parse_expr("(x)").unwrap(),
+            Parser::new("(x)").parse_expr().unwrap(),
             Expr::Var {
                 name: "x".to_string(),
                 id: Id::dummy(),
@@ -330,9 +330,12 @@ mod tests {
 
     #[test]
     fn test_parse_integer_literal() {
-        assert_eq!(parse_expr("1").unwrap(), Expr::IntegerLiteral { value: 1 });
         assert_eq!(
-            parse_expr("123").unwrap(),
+            Parser::new("1").parse_expr().unwrap(),
+            Expr::IntegerLiteral { value: 1 }
+        );
+        assert_eq!(
+            Parser::new("123").parse_expr().unwrap(),
             Expr::IntegerLiteral { value: 123 }
         );
     }
@@ -340,7 +343,7 @@ mod tests {
     #[test]
     fn test_parse_string_literal() {
         assert_eq!(
-            parse_expr("\"hello\"").unwrap(),
+            Parser::new("\"hello\"").parse_expr().unwrap(),
             Expr::StringLiteral {
                 value: "hello".to_string()
             }
@@ -350,7 +353,7 @@ mod tests {
     #[test]
     fn test_parse_funcall() {
         assert_eq!(
-            parse_expr("f()").unwrap(),
+            Parser::new("f()").parse_expr().unwrap(),
             Expr::Call {
                 callee: Box::new(Expr::Var {
                     name: "f".to_string(),
@@ -360,7 +363,7 @@ mod tests {
             }
         );
         assert_eq!(
-            parse_expr("f(x)").unwrap(),
+            Parser::new("f(x)").parse_expr().unwrap(),
             Expr::Call {
                 callee: Box::new(Expr::Var {
                     name: "f".to_string(),
@@ -373,7 +376,7 @@ mod tests {
             }
         );
         assert_eq!(
-            parse_expr("f(x, y)").unwrap(),
+            Parser::new("f(x, y)").parse_expr().unwrap(),
             Expr::Call {
                 callee: Box::new(Expr::Var {
                     name: "f".to_string(),

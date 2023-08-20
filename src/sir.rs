@@ -70,11 +70,9 @@ impl Inst {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InstKind {
-    #[allow(unused)] // TODO: remove it later
     Jump {
         target: usize,
     },
-    #[allow(unused)] // TODO: remove it later
     Branch {
         cond: usize,
         branch_then: usize,
@@ -134,7 +132,6 @@ pub enum Literal {
     Unit,
     // TODO: use BigInt
     Integer(i32),
-    #[allow(unused)] // TODO: remove it later
     Bool(bool),
     String(Arc<String>),
 }
@@ -142,7 +139,6 @@ pub enum Literal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BuiltinKind {
     Add,
-    #[allow(unused)] // TODO: remove it later
     Lt,
     Puts,
     Puti,
@@ -197,7 +193,6 @@ pub mod testing {
     }
 
     impl ProgramUnitDescriber {
-        #[allow(unused)] // TODO: remove it later
         pub fn function(&mut self, function_id: usize, function: Function) -> &mut Self {
             self.program_unit.functions[function_id] = function;
             self

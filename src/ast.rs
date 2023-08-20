@@ -4,46 +4,37 @@ use crate::cctx::{CCtx, Id};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Stmt {
-    #[allow(unused)] // TODO: remove this annotation later
     Let { name: String, id: Id, init: Expr },
-    #[allow(unused)] // TODO: remove this annotation later
     Expr { expr: Expr, use_value: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
-    #[allow(unused)] // TODO: remove this annotation later
     Var {
         name: String,
         id: Id,
     },
-    #[allow(unused)] // TODO: remove this annotation later
     Branch {
         cond: Box<Expr>,
         then: Box<Expr>,
         else_: Box<Expr>,
     },
-    #[allow(unused)] // TODO: remove this annotation later
     While {
         cond: Box<Expr>,
         body: Box<Expr>,
     },
-    #[allow(unused)] // TODO: remove this annotation later
     Block {
         stmts: Vec<Stmt>,
     },
-    #[allow(unused)] // TODO: remove this annotation later
     Assign {
         name: String,
         id: Id,
         rhs: Box<Expr>,
     },
-    #[allow(unused)] // TODO: remove this annotation later
     Call {
         callee: Box<Expr>,
         args: Vec<Expr>,
     },
-    #[allow(unused)] // TODO: remove this annotation later
     // TODO: use BigInt
     IntegerLiteral {
         value: i32,
@@ -51,7 +42,6 @@ pub enum Expr {
     StringLiteral {
         value: String,
     },
-    #[allow(unused)] // TODO: remove this annotation later
     BinOp {
         op: BinOp,
         lhs: Box<Expr>,
@@ -139,7 +129,6 @@ impl Scope {
     }
 }
 
-#[allow(unused)] // TODO: remove this annotation later
 pub fn assign_id_stmts(cctx: &CCtx, scope: &mut Scope, stmts: &mut Vec<Stmt>) {
     let checkpoint = scope.checkpoint();
     for stmt in stmts {
@@ -220,7 +209,6 @@ pub mod testing {
             }
         }
 
-        #[allow(unused)] // TODO: remove this annotation later
         pub fn expr(expr: Expr) -> Stmt {
             Stmt::Expr {
                 expr,

@@ -102,7 +102,6 @@ impl TyCtx {
             }
         }
     }
-    #[allow(unused)] // TODO: remove it later
     fn has_any_ty_var(&self, ty: &Type) -> bool {
         match ty {
             Type::Var { var_id } => {

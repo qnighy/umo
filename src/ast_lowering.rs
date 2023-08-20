@@ -5,7 +5,6 @@ use crate::ast::{BinOp, BuiltinIds, BuiltinKind, Expr, Stmt};
 use crate::cctx::Id;
 use crate::sir;
 
-#[allow(unused)] // TODO: remove this annotation later
 pub fn lower(builtin_ids: &BuiltinIds, stmts: &[Stmt]) -> sir::Function {
     let num_args = 0;
     let mut num_named_vars = num_args;

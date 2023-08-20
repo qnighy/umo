@@ -2,6 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+use ast::BuiltinIds;
+use cctx::CCtx;
+
 mod ast;
 mod ast_lowering;
 mod cctx;
@@ -17,32 +20,7 @@ pub mod testing;
 
 pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
     let source = fs::read_to_string(source_path).unwrap();
-    if source == "use lang::\"0.0.1\";\nputs(\"Hello, world!\");\n" {
-        eval_::eval(
-            ctx,
-            &sir::ProgramUnit::new(vec![sir::Function::new(
-                0,
-                4,
-                vec![sir::BasicBlock::new(vec![
-                    sir::Inst::new(sir::InstKind::Builtin {
-                        lhs: 0,
-                        builtin: sir::BuiltinKind::Puts,
-                    }),
-                    sir::Inst::new(sir::InstKind::Literal {
-                        lhs: 1,
-                        value: sir::Literal::String(Arc::new("Hello, world!".to_string())),
-                    }),
-                    sir::Inst::new(sir::InstKind::PushArg { value_ref: 1 }),
-                    sir::Inst::new(sir::InstKind::Call { lhs: 3, callee: 0 }),
-                    sir::Inst::new(sir::InstKind::Literal {
-                        lhs: 2,
-                        value: sir::Literal::Unit,
-                    }),
-                    sir::Inst::new(sir::InstKind::Return { rhs: 2 }),
-                ])],
-            )]),
-        );
-    } else if source == "use lang::\"0.0.1\";\nputi(1 + 1);\n" {
+    if source == "use lang::\"0.0.1\";\nputi(1 + 1);\n" {
         eval_::eval(
             ctx,
             &sir::ProgramUnit::new(vec![sir::Function::new(
@@ -79,7 +57,14 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
             )]),
         );
     } else {
-        todo!("Proper parsing and execution");
+        let cctx = CCtx::new();
+        let builtin_ids = BuiltinIds::new(&cctx);
+        let mut program_ast = crate::parser::parse(&source).unwrap();
+        let mut scope = crate::ast::Scope::new(&builtin_ids);
+        crate::ast::assign_id_stmts(&cctx, &mut scope, &mut program_ast);
+        let program_sir = ast_lowering::lower(&builtin_ids, &program_ast);
+        let program_unit = sir::ProgramUnit::new(vec![program_sir]);
+        crate::eval_::eval(ctx, &program_unit);
     }
 }
 
