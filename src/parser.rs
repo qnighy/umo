@@ -1,4 +1,5 @@
 use crate::ast::Expr;
+use crate::cctx::Id;
 
 #[derive(Debug)]
 pub struct ParseError;
@@ -21,6 +22,13 @@ impl Parser {
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         let tok = self.next_token()?;
         match tok.kind {
+            TokenKind::Identifier => {
+                let name = std::str::from_utf8(&self.buf[tok.begin..tok.end]).unwrap();
+                Ok(Expr::Var {
+                    name: name.to_string(),
+                    id: Id::dummy(),
+                })
+            }
             TokenKind::Integer => {
                 let s = std::str::from_utf8(&self.buf[tok.begin..tok.end]).unwrap();
                 let value = s.parse::<i32>().unwrap();
@@ -38,6 +46,18 @@ impl Parser {
         self.skip_whitespace();
         let begin = self.pos;
         let kind = match self.buf.get(self.pos).copied() {
+            Some(b'a'..=b'z') | Some(b'A'..=b'Z') | Some(b'_') => {
+                while self.pos < self.buf.len()
+                    && (self.buf[self.pos].is_ascii_alphanumeric() || self.buf[self.pos] == b'_')
+                {
+                    self.pos += 1;
+                }
+                match &self.buf[begin..self.pos] {
+                    // TODO: other reserved identifiers
+                    b"true" | b"false" => todo!(),
+                    _ => TokenKind::Identifier,
+                }
+            }
             Some(b'0'..=b'9') => {
                 // TODO: check leading zero
                 while self.pos < self.buf.len() && self.buf[self.pos].is_ascii_digit() {
@@ -82,6 +102,7 @@ struct Token {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TokenKind {
+    Identifier,
     Integer,
     String,
 }
@@ -89,6 +110,17 @@ enum TokenKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_var_ref() {
+        assert_eq!(
+            parse_expr("x").unwrap(),
+            Expr::Var {
+                name: "x".to_string(),
+                id: Id::dummy(),
+            }
+        );
+    }
 
     #[test]
     fn test_parse_integer_literal() {
