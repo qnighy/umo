@@ -24,6 +24,17 @@ impl Parser {
             next_token_cache: None,
         }
     }
+    fn parse_program(&mut self) -> Result<Vec<Stmt>, ParseError> {
+        // Preliminary preamble
+        if self.buf[self.pos..].starts_with(b"use lang::\"0.0.1\";\n") {
+            self.pos += b"use lang::\"0.0.1\";\n".len();
+        } else {
+            return Err(ParseError);
+        }
+        let stmts = self.parse_stmts()?;
+        self.expect_eof()?;
+        Ok(stmts)
+    }
     fn parse_stmts(&mut self) -> Result<Vec<Stmt>, ParseError> {
         let mut stmts = vec![];
         loop {
@@ -178,6 +189,13 @@ impl Parser {
             }
             _ => Err(ParseError),
         }
+    }
+    fn expect_eof(&mut self) -> Result<(), ParseError> {
+        let tok = self.next_token()?;
+        if tok.kind != TokenKind::Eof {
+            return Err(ParseError);
+        }
+        Ok(())
     }
     fn bump(&mut self) {
         assert!(self.next_token_cache.is_some());
@@ -413,6 +431,29 @@ mod tests {
     fn test_parse_stmts() {
         assert_eq!(
             Parser::new("let x = 1; then x;").parse_stmts().unwrap(),
+            vec![
+                Stmt::Let {
+                    name: "x".to_string(),
+                    id: Id::dummy(),
+                    init: Expr::IntegerLiteral { value: 1 },
+                },
+                Stmt::Expr {
+                    expr: Expr::Var {
+                        name: "x".to_string(),
+                        id: Id::dummy(),
+                    },
+                    use_value: true,
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_program() {
+        assert_eq!(
+            Parser::new("use lang::\"0.0.1\";\nlet x = 1;\nthen x;\n")
+                .parse_program()
+                .unwrap(),
             vec![
                 Stmt::Let {
                     name: "x".to_string(),
