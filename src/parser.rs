@@ -24,6 +24,16 @@ impl Parser {
             next_token_cache: None,
         }
     }
+    fn parse_stmts(&mut self) -> Result<Vec<Stmt>, ParseError> {
+        let mut stmts = vec![];
+        loop {
+            if self.lookahead_delim()? {
+                break;
+            }
+            stmts.push(self.parse_stmt()?);
+        }
+        Ok(stmts)
+    }
     fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
         let tok = self.next_token()?;
         match tok.kind {
@@ -396,6 +406,27 @@ mod tests {
                 expr: Expr::IntegerLiteral { value: 1 },
                 use_value: false,
             }
+        );
+    }
+
+    #[test]
+    fn test_parse_stmts() {
+        assert_eq!(
+            Parser::new("let x = 1; then x;").parse_stmts().unwrap(),
+            vec![
+                Stmt::Let {
+                    name: "x".to_string(),
+                    id: Id::dummy(),
+                    init: Expr::IntegerLiteral { value: 1 },
+                },
+                Stmt::Expr {
+                    expr: Expr::Var {
+                        name: "x".to_string(),
+                        id: Id::dummy(),
+                    },
+                    use_value: true,
+                }
+            ]
         );
     }
 }
