@@ -205,7 +205,7 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
                     value_ref: arg_var,
                 }));
             }
-            fctx.push(sir::Inst::new(sir::InstKind::Call_ {
+            fctx.push(sir::Inst::new(sir::InstKind::Call {
                 lhs: result_var,
                 callee: callee_var,
             }));
@@ -241,7 +241,7 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
             fctx.push(sir::Inst::new(sir::InstKind::PushArg {
                 value_ref: rhs_var,
             }));
-            fctx.push(sir::Inst::new(sir::InstKind::Call_ {
+            fctx.push(sir::Inst::new(sir::InstKind::Call {
                 lhs: result_var,
                 callee: callee_var,
             }));

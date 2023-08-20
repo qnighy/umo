@@ -33,7 +33,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                         value: sir::Literal::String(Arc::new("Hello, world!".to_string())),
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 1 }),
-                    sir::Inst::new(sir::InstKind::Call_ { lhs: 3, callee: 0 }),
+                    sir::Inst::new(sir::InstKind::Call { lhs: 3, callee: 0 }),
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 2,
                         value: sir::Literal::Unit,
@@ -67,9 +67,9 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 2 }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 3 }),
-                    sir::Inst::new(sir::InstKind::Call_ { lhs: 4, callee: 1 }),
+                    sir::Inst::new(sir::InstKind::Call { lhs: 4, callee: 1 }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 4 }),
-                    sir::Inst::new(sir::InstKind::Call_ { lhs: 6, callee: 0 }),
+                    sir::Inst::new(sir::InstKind::Call { lhs: 6, callee: 0 }),
                     sir::Inst::new(sir::InstKind::Literal {
                         lhs: 5,
                         value: sir::Literal::Unit,

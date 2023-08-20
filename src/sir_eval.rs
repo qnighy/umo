@@ -93,7 +93,7 @@ fn eval1_bb(
                 let value = state.vars[*value_ref].take().unwrap();
                 state.args.push(value);
             }
-            InstKind::Call_ {
+            InstKind::Call {
                 lhs,
                 callee: callee_rhs,
             } => {

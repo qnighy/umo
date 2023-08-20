@@ -104,7 +104,7 @@ fn liveness_bb(
             InstKind::PushArg { value_ref } => {
                 alive.insert(*value_ref);
             }
-            InstKind::Call_ { lhs, callee } => {
+            InstKind::Call { lhs, callee } => {
                 alive.remove(*lhs);
                 alive.insert(*callee);
             }
@@ -223,7 +223,7 @@ fn moved_rhs_of(inst: &Inst) -> Option<usize> {
         } => None,
         InstKind::Builtin { lhs: _, builtin: _ } => None,
         InstKind::PushArg { value_ref } => Some(*value_ref),
-        InstKind::Call_ { lhs: _, callee } => Some(*callee),
+        InstKind::Call { lhs: _, callee } => Some(*callee),
     }
 }
 
@@ -256,7 +256,7 @@ fn replace_moved_rhs(inst: &mut Inst, to: usize) {
         InstKind::PushArg { value_ref } => {
             *value_ref = to;
         }
-        InstKind::Call_ { callee, .. } => {
+        InstKind::Call { callee, .. } => {
             *callee = to;
         }
     }
@@ -273,7 +273,7 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
         InstKind::Closure { lhs, .. } => Some(*lhs),
         InstKind::Builtin { lhs, .. } => Some(*lhs),
         InstKind::PushArg { .. } => None,
-        InstKind::Call_ { lhs, .. } => Some(*lhs),
+        InstKind::Call { lhs, .. } => Some(*lhs),
     }
 }
 

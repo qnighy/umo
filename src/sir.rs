@@ -105,7 +105,7 @@ pub enum InstKind {
     PushArg {
         value_ref: usize,
     },
-    Call_ {
+    Call {
         lhs: usize,
         callee: usize,
     },
@@ -121,7 +121,7 @@ impl InstKind {
             | InstKind::PushArg { .. }
             | InstKind::Closure { .. }
             | InstKind::Builtin { .. }
-            | InstKind::Call_ { .. } => false,
+            | InstKind::Call { .. } => false,
         }
     }
     pub fn is_middle(&self) -> bool {
@@ -312,7 +312,7 @@ pub mod testing {
             Inst::new(InstKind::PushArg { value_ref })
         }
         pub fn call(lhs: usize, callee: usize) -> Inst {
-            Inst::new(InstKind::Call_ { lhs, callee })
+            Inst::new(InstKind::Call { lhs, callee })
         }
     }
 }

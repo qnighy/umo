@@ -248,7 +248,7 @@ fn typecheck_bb(
             InstKind::PushArg { value_ref } => {
                 args.push(state.vars[*value_ref].clone());
             }
-            InstKind::Call_ { lhs, callee } => {
+            InstKind::Call { lhs, callee } => {
                 let callee_type = &state.vars[*callee];
                 let (callee_args, callee_ret) =
                     match ty_ctx.expand_shallow(callee_type).into_owned() {
