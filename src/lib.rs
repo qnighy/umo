@@ -7,13 +7,13 @@ mod ast_lowering;
 mod cctx;
 mod eval_;
 pub mod old;
+mod parser;
 pub mod rt_ctx;
 mod sir;
 mod sir_compile;
 mod sir_eval;
 mod sir_typecheck;
 pub mod testing;
-mod parser;
 
 pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
     let source = fs::read_to_string(source_path).unwrap();
@@ -67,7 +67,7 @@ pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
                     }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 2 }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 3 }),
-                    sir::Inst::new(sir::InstKind::Call_ { lhs: 4, callee: 2 }),
+                    sir::Inst::new(sir::InstKind::Call_ { lhs: 4, callee: 1 }),
                     sir::Inst::new(sir::InstKind::PushArg { value_ref: 4 }),
                     sir::Inst::new(sir::InstKind::Call_ { lhs: 6, callee: 0 }),
                     sir::Inst::new(sir::InstKind::Literal {
