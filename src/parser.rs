@@ -5,10 +5,7 @@ use crate::cctx::Id;
 pub struct ParseError;
 
 pub fn parse_expr(source: &str) -> Result<Expr, ParseError> {
-    let mut parser = Parser {
-        buf: source.as_bytes().to_vec(),
-        pos: 0,
-    };
+    let mut parser = Parser::new(source);
     parser.parse_expr()
 }
 
@@ -16,13 +13,81 @@ pub fn parse_expr(source: &str) -> Result<Expr, ParseError> {
 struct Parser {
     buf: Vec<u8>,
     pos: usize,
+    next_token_cache: Option<Token>,
 }
 
 impl Parser {
+    fn new(source: &str) -> Self {
+        Self {
+            buf: source.as_bytes().to_vec(),
+            pos: 0,
+            next_token_cache: None,
+        }
+    }
+    fn parse_exprs(&mut self) -> Result<Vec<Expr>, ParseError> {
+        let mut exprs = vec![];
+        loop {
+            if self.lookahead_delim()? {
+                // Empty list or trailing comma
+                break;
+            }
+            exprs.push(self.parse_expr()?);
+
+            let tok = self.next_token()?;
+            if matches!(tok.kind, TokenKind::Comma) {
+                self.bump();
+            } else if self.lookahead_delim()? {
+                // Non-empty list without trailing comma
+                break;
+            } else {
+                return Err(ParseError);
+            }
+        }
+        Ok(exprs)
+    }
+    fn lookahead_delim(&mut self) -> Result<bool, ParseError> {
+        let tok = self.next_token()?;
+        Ok(matches!(tok.kind, TokenKind::RParen | TokenKind::Eof))
+    }
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+        let mut e = self.parse_expr_primary()?;
+        loop {
+            let tok = self.next_token()?;
+            match tok.kind {
+                TokenKind::LParen => {
+                    self.bump();
+                    let args = self.parse_exprs()?;
+                    let tok = self.next_token()?;
+                    if tok.kind != TokenKind::RParen {
+                        return Err(ParseError);
+                    }
+                    self.bump();
+                    e = Expr::Call {
+                        callee: Box::new(e),
+                        args,
+                    };
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        Ok(e)
+    }
+    fn parse_expr_primary(&mut self) -> Result<Expr, ParseError> {
         let tok = self.next_token()?;
         match tok.kind {
+            TokenKind::LParen => {
+                self.bump();
+                let e = self.parse_expr()?;
+                let tok = self.next_token()?;
+                if tok.kind != TokenKind::RParen {
+                    return Err(ParseError);
+                }
+                Ok(e)
+            }
             TokenKind::Identifier => {
+                self.bump();
                 let name = std::str::from_utf8(&self.buf[tok.begin..tok.end]).unwrap();
                 Ok(Expr::Var {
                     name: name.to_string(),
@@ -30,22 +95,44 @@ impl Parser {
                 })
             }
             TokenKind::Integer => {
+                self.bump();
                 let s = std::str::from_utf8(&self.buf[tok.begin..tok.end]).unwrap();
                 let value = s.parse::<i32>().unwrap();
                 Ok(Expr::IntegerLiteral { value })
             }
             TokenKind::String => {
+                self.bump();
                 let s = std::str::from_utf8(&self.buf[tok.begin + 1..tok.end - 1]).unwrap();
                 Ok(Expr::StringLiteral {
                     value: s.to_string(),
                 })
             }
+            _ => Err(ParseError),
         }
     }
+    fn bump(&mut self) {
+        assert!(self.next_token_cache.is_some());
+        self.next_token_cache = None;
+    }
     fn next_token(&mut self) -> Result<Token, ParseError> {
+        if let Some(tok) = self.next_token_cache.clone() {
+            return Ok(tok);
+        }
         self.skip_whitespace();
         let begin = self.pos;
         let kind = match self.buf.get(self.pos).copied() {
+            Some(b'(') => {
+                self.pos += 1;
+                TokenKind::LParen
+            }
+            Some(b')') => {
+                self.pos += 1;
+                TokenKind::RParen
+            }
+            Some(b',') => {
+                self.pos += 1;
+                TokenKind::Comma
+            }
             Some(b'a'..=b'z') | Some(b'A'..=b'Z') | Some(b'_') => {
                 while self.pos < self.buf.len()
                     && (self.buf[self.pos].is_ascii_alphanumeric() || self.buf[self.pos] == b'_')
@@ -77,10 +164,13 @@ impl Parser {
                 self.pos += 1;
                 TokenKind::String
             }
+            None => TokenKind::Eof,
             _ => return Err(ParseError),
         };
         let end = self.pos;
-        Ok(Token { kind, begin, end })
+        let tok = Token { kind, begin, end };
+        self.next_token_cache = Some(tok.clone());
+        Ok(tok)
     }
 
     fn skip_whitespace(&mut self) {
@@ -102,9 +192,13 @@ struct Token {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TokenKind {
+    LParen,
+    RParen,
+    Comma,
     Identifier,
     Integer,
     String,
+    Eof,
 }
 
 #[cfg(test)]
@@ -112,9 +206,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_var_ref() {
+    fn test_parse_var_ref() {
         assert_eq!(
             parse_expr("x").unwrap(),
+            Expr::Var {
+                name: "x".to_string(),
+                id: Id::dummy(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_paren() {
+        assert_eq!(
+            parse_expr("(x)").unwrap(),
             Expr::Var {
                 name: "x".to_string(),
                 id: Id::dummy(),
@@ -137,6 +242,52 @@ mod tests {
             parse_expr("\"hello\"").unwrap(),
             Expr::StringLiteral {
                 value: "hello".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_funcall() {
+        assert_eq!(
+            parse_expr("f()").unwrap(),
+            Expr::Call {
+                callee: Box::new(Expr::Var {
+                    name: "f".to_string(),
+                    id: Id::dummy(),
+                }),
+                args: vec![],
+            }
+        );
+        assert_eq!(
+            parse_expr("f(x)").unwrap(),
+            Expr::Call {
+                callee: Box::new(Expr::Var {
+                    name: "f".to_string(),
+                    id: Id::dummy(),
+                }),
+                args: vec![Expr::Var {
+                    name: "x".to_string(),
+                    id: Id::dummy(),
+                }],
+            }
+        );
+        assert_eq!(
+            parse_expr("f(x, y)").unwrap(),
+            Expr::Call {
+                callee: Box::new(Expr::Var {
+                    name: "f".to_string(),
+                    id: Id::dummy(),
+                }),
+                args: vec![
+                    Expr::Var {
+                        name: "x".to_string(),
+                        id: Id::dummy(),
+                    },
+                    Expr::Var {
+                        name: "y".to_string(),
+                        id: Id::dummy(),
+                    }
+                ],
             }
         );
     }
