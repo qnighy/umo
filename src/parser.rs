@@ -26,6 +26,12 @@ impl Parser {
                 let value = s.parse::<i32>().unwrap();
                 Ok(Expr::IntegerLiteral { value })
             }
+            TokenKind::String => {
+                let s = std::str::from_utf8(&self.buf[tok.begin + 1..tok.end - 1]).unwrap();
+                Ok(Expr::StringLiteral {
+                    value: s.to_string(),
+                })
+            }
         }
     }
     fn next_token(&mut self) -> Result<Token, ParseError> {
@@ -38,6 +44,18 @@ impl Parser {
                     self.pos += 1;
                 }
                 TokenKind::Integer
+            }
+            Some(b'"') => {
+                self.pos += 1;
+                while self.pos < self.buf.len() && self.buf[self.pos] != b'"' {
+                    // TODO: handle escapes etc.
+                    self.pos += 1;
+                }
+                if self.pos == self.buf.len() {
+                    return Err(ParseError);
+                }
+                self.pos += 1;
+                TokenKind::String
             }
             _ => return Err(ParseError),
         };
@@ -65,6 +83,7 @@ struct Token {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TokenKind {
     Integer,
+    String,
 }
 
 #[cfg(test)]
@@ -77,6 +96,16 @@ mod tests {
         assert_eq!(
             parse_expr("123").unwrap(),
             Expr::IntegerLiteral { value: 123 }
+        );
+    }
+
+    #[test]
+    fn test_parse_string_literal() {
+        assert_eq!(
+            parse_expr("\"hello\"").unwrap(),
+            Expr::StringLiteral {
+                value: "hello".to_string()
+            }
         );
     }
 }
