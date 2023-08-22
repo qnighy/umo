@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Stmt};
+use crate::ast::{BinOp, Expr, Stmt};
 use crate::cctx::Id;
 
 #[derive(Debug)]
@@ -130,6 +130,42 @@ impl Parser {
         Ok(matches!(tok.kind, TokenKind::RParen | TokenKind::Eof))
     }
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+        let mut e = self.parse_expr_additive()?;
+        loop {
+            let tok = self.next_token()?;
+            let bin_op = match tok.kind {
+                TokenKind::LessThan => BinOp::Lt,
+                _ => break,
+            };
+            self.bump();
+            let rhs = self.parse_expr_additive()?;
+            e = Expr::BinOp {
+                op: bin_op,
+                lhs: Box::new(e),
+                rhs: Box::new(rhs),
+            };
+        }
+        Ok(e)
+    }
+    fn parse_expr_additive(&mut self) -> Result<Expr, ParseError> {
+        let mut e = self.parse_expr_call()?;
+        loop {
+            let tok = self.next_token()?;
+            let bin_op = match tok.kind {
+                TokenKind::Plus => BinOp::Add,
+                _ => break,
+            };
+            self.bump();
+            let rhs = self.parse_expr_call()?;
+            e = Expr::BinOp {
+                op: bin_op,
+                lhs: Box::new(e),
+                rhs: Box::new(rhs),
+            };
+        }
+        Ok(e)
+    }
+    fn parse_expr_call(&mut self) -> Result<Expr, ParseError> {
         let mut e = self.parse_expr_primary()?;
         loop {
             let tok = self.next_token()?;
@@ -216,6 +252,10 @@ impl Parser {
                 self.pos += 1;
                 TokenKind::RParen
             }
+            Some(b'+') => {
+                self.pos += 1;
+                TokenKind::Plus
+            }
             Some(b',') => {
                 self.pos += 1;
                 TokenKind::Comma
@@ -223,6 +263,10 @@ impl Parser {
             Some(b';') => {
                 self.pos += 1;
                 TokenKind::Semicolon
+            }
+            Some(b'<') => {
+                self.pos += 1;
+                TokenKind::LessThan
             }
             Some(b'=') => {
                 self.pos += 1;
@@ -289,10 +333,19 @@ struct Token {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TokenKind {
+    /// `(`
     LParen,
+    /// `)`
     RParen,
+    /// `+`
+    Plus,
+    /// `,`
     Comma,
+    /// `;`
     Semicolon,
+    /// `<`
+    LessThan,
+    /// `=`
     Equal,
     KeywordLet,
     KeywordThen,
@@ -392,6 +445,30 @@ mod tests {
                         id: Id::dummy(),
                     }
                 ],
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_additive() {
+        assert_eq!(
+            Parser::new("1 + 2").parse_expr().unwrap(),
+            Expr::BinOp {
+                op: BinOp::Add,
+                lhs: Box::new(Expr::IntegerLiteral { value: 1 }),
+                rhs: Box::new(Expr::IntegerLiteral { value: 2 }),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_comparison() {
+        assert_eq!(
+            Parser::new("1 < 2").parse_expr().unwrap(),
+            Expr::BinOp {
+                op: BinOp::Lt,
+                lhs: Box::new(Expr::IntegerLiteral { value: 1 }),
+                rhs: Box::new(Expr::IntegerLiteral { value: 2 }),
             }
         );
     }
