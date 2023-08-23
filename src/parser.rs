@@ -127,7 +127,10 @@ impl Parser {
     }
     fn lookahead_delim(&mut self) -> Result<bool, ParseError> {
         let tok = self.next_token()?;
-        Ok(matches!(tok.kind, TokenKind::RParen | TokenKind::Eof))
+        Ok(matches!(
+            tok.kind,
+            TokenKind::RParen | TokenKind::RBrace | TokenKind::Eof
+        ))
     }
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         let mut e = self.parse_expr_additive()?;
@@ -210,6 +213,61 @@ impl Parser {
                     id: Id::dummy(),
                 })
             }
+            TokenKind::KeywordDo => {
+                // do { <stmts> }
+                self.bump();
+                Ok(self.parse_block_expr()?)
+            }
+            TokenKind::KeywordIf => {
+                self.bump();
+                let cond = self.parse_expr()?;
+                let tok = self.next_token()?;
+                match tok.kind {
+                    TokenKind::KeywordThen => {
+                        // if <cond> then <then> else <else>
+                        self.bump();
+                        let then = self.parse_expr()?;
+                        let tok = self.next_token()?;
+                        if tok.kind != TokenKind::KeywordElse {
+                            return Err(ParseError);
+                        }
+                        self.bump();
+                        // TODO: primary should not be right-open
+                        let else_ = self.parse_expr_primary()?;
+                        Ok(Expr::Branch {
+                            cond: Box::new(cond),
+                            then: Box::new(then),
+                            else_: Box::new(else_),
+                        })
+                    }
+                    TokenKind::LBrace => {
+                        let then = self.parse_block_expr()?;
+                        let tok = self.next_token()?;
+                        if tok.kind == TokenKind::KeywordElse {
+                            // if <cond> { <then> } else { <else> }
+
+                            // TODO: deal with ambiguous cases like
+                            // if <cond1> then if <cond2> { <then2> } else { <else1> }
+                            self.bump();
+                            // TODO: also handle else-if exceptions
+                            let else_ = self.parse_block_expr()?;
+                            Ok(Expr::Branch {
+                                cond: Box::new(cond),
+                                then: Box::new(then),
+                                else_: Box::new(else_),
+                            })
+                        } else {
+                            // if <cond> { <then> }
+                            Ok(Expr::Branch {
+                                cond: Box::new(cond),
+                                then: Box::new(then),
+                                else_: Box::new(Expr::Block { stmts: vec![] }),
+                            })
+                        }
+                    }
+                    _ => return Err(ParseError),
+                }
+            }
             TokenKind::Integer => {
                 self.bump();
                 let s = std::str::from_utf8(&self.buf[tok.begin..tok.end]).unwrap();
@@ -225,6 +283,20 @@ impl Parser {
             }
             _ => Err(ParseError),
         }
+    }
+    fn parse_block_expr(&mut self) -> Result<Expr, ParseError> {
+        let tok = self.next_token()?;
+        if tok.kind != TokenKind::LBrace {
+            return Err(ParseError);
+        }
+        self.bump();
+        let stmts = self.parse_stmts()?;
+        let tok = self.next_token()?;
+        if tok.kind != TokenKind::RBrace {
+            return Err(ParseError);
+        }
+        self.bump();
+        Ok(Expr::Block { stmts })
     }
     fn expect_eof(&mut self) -> Result<(), ParseError> {
         let tok = self.next_token()?;
@@ -272,6 +344,14 @@ impl Parser {
                 self.pos += 1;
                 TokenKind::Equal
             }
+            Some(b'{') => {
+                self.pos += 1;
+                TokenKind::LBrace
+            }
+            Some(b'}') => {
+                self.pos += 1;
+                TokenKind::RBrace
+            }
             Some(b'a'..=b'z') | Some(b'A'..=b'Z') | Some(b'_') => {
                 while self.pos < self.buf.len()
                     && (self.buf[self.pos].is_ascii_alphanumeric() || self.buf[self.pos] == b'_')
@@ -281,8 +361,12 @@ impl Parser {
                 match &self.buf[begin..self.pos] {
                     // TODO: other reserved identifiers
                     b"true" | b"false" => todo!(),
+                    b"do" => TokenKind::KeywordDo,
+                    b"else" => TokenKind::KeywordElse,
+                    b"if" => TokenKind::KeywordIf,
                     b"let" => TokenKind::KeywordLet,
                     b"then" => TokenKind::KeywordThen,
+                    b"while" => TokenKind::KeywordWhile,
                     _ => TokenKind::Identifier,
                 }
             }
@@ -347,8 +431,16 @@ enum TokenKind {
     LessThan,
     /// `=`
     Equal,
+    /// `{`
+    LBrace,
+    /// `}`
+    RBrace,
+    KeywordDo,
+    KeywordElse,
+    KeywordIf,
     KeywordLet,
     KeywordThen,
+    KeywordWhile,
     Identifier,
     Integer,
     String,
@@ -445,6 +537,97 @@ mod tests {
                         id: Id::dummy(),
                     }
                 ],
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_if_else_in_block_style() {
+        assert_eq!(
+            Parser::new("if x { y; } else { z; }").parse_expr().unwrap(),
+            Expr::Branch {
+                cond: Box::new(Expr::Var {
+                    name: "x".to_string(),
+                    id: Id::dummy(),
+                }),
+                then: Box::new(Expr::Block {
+                    stmts: vec![Stmt::Expr {
+                        expr: Expr::Var {
+                            name: "y".to_string(),
+                            id: Id::dummy(),
+                        },
+                        use_value: false,
+                    }],
+                }),
+                else_: Box::new(Expr::Block {
+                    stmts: vec![Stmt::Expr {
+                        expr: Expr::Var {
+                            name: "z".to_string(),
+                            id: Id::dummy(),
+                        },
+                        use_value: false,
+                    }],
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_if_without_else_in_block_style() {
+        assert_eq!(
+            Parser::new("if x { y; }").parse_expr().unwrap(),
+            Expr::Branch {
+                cond: Box::new(Expr::Var {
+                    name: "x".to_string(),
+                    id: Id::dummy(),
+                }),
+                then: Box::new(Expr::Block {
+                    stmts: vec![Stmt::Expr {
+                        expr: Expr::Var {
+                            name: "y".to_string(),
+                            id: Id::dummy(),
+                        },
+                        use_value: false,
+                    }],
+                }),
+                else_: Box::new(Expr::Block { stmts: vec![] }),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_if_then_else() {
+        assert_eq!(
+            Parser::new("if x then y else z").parse_expr().unwrap(),
+            Expr::Branch {
+                cond: Box::new(Expr::Var {
+                    name: "x".to_string(),
+                    id: Id::dummy(),
+                }),
+                then: Box::new(Expr::Var {
+                    name: "y".to_string(),
+                    id: Id::dummy(),
+                }),
+                else_: Box::new(Expr::Var {
+                    name: "z".to_string(),
+                    id: Id::dummy(),
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_do_expr() {
+        assert_eq!(
+            Parser::new("do { x; }").parse_expr().unwrap(),
+            Expr::Block {
+                stmts: vec![Stmt::Expr {
+                    expr: Expr::Var {
+                        name: "x".to_string(),
+                        id: Id::dummy(),
+                    },
+                    use_value: false,
+                }],
             }
         );
     }
