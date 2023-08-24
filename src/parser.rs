@@ -133,6 +133,26 @@ impl Parser {
         ))
     }
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+        let e = self.parse_expr_comparison()?;
+        let tok = self.next_token()?;
+        match tok.kind {
+            TokenKind::Equal => {
+                self.bump();
+                let Expr::Var { name, id: _ } = e else {
+                    return Err(ParseError);
+                };
+                let rhs = self.parse_expr()?;
+                return Ok(Expr::Assign {
+                    name,
+                    id: Id::dummy(),
+                    rhs: Box::new(rhs),
+                });
+            }
+            _ => {}
+        }
+        Ok(e)
+    }
+    fn parse_expr_comparison(&mut self) -> Result<Expr, ParseError> {
         let mut e = self.parse_expr_additive()?;
         loop {
             let tok = self.next_token()?;
@@ -267,6 +287,20 @@ impl Parser {
                     }
                     _ => return Err(ParseError),
                 }
+            }
+            TokenKind::KeywordWhile => {
+                // while <cond> { <body> }
+                self.bump();
+                let cond = self.parse_expr()?;
+                let tok = self.next_token()?;
+                if tok.kind != TokenKind::LBrace {
+                    return Err(ParseError);
+                }
+                let body = self.parse_block_expr()?;
+                Ok(Expr::While {
+                    cond: Box::new(cond),
+                    body: Box::new(body),
+                })
             }
             TokenKind::Integer => {
                 self.bump();
@@ -617,6 +651,28 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_while() {
+        assert_eq!(
+            Parser::new("while x { y; }").parse_expr().unwrap(),
+            Expr::While {
+                cond: Box::new(Expr::Var {
+                    name: "x".to_string(),
+                    id: Id::dummy(),
+                }),
+                body: Box::new(Expr::Block {
+                    stmts: vec![Stmt::Expr {
+                        expr: Expr::Var {
+                            name: "y".to_string(),
+                            id: Id::dummy(),
+                        },
+                        use_value: false,
+                    }],
+                }),
+            }
+        );
+    }
+
+    #[test]
     fn test_parse_do_expr() {
         assert_eq!(
             Parser::new("do { x; }").parse_expr().unwrap(),
@@ -652,6 +708,18 @@ mod tests {
                 op: BinOp::Lt,
                 lhs: Box::new(Expr::IntegerLiteral { value: 1 }),
                 rhs: Box::new(Expr::IntegerLiteral { value: 2 }),
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_assignment() {
+        assert_eq!(
+            Parser::new("x = 1").parse_expr().unwrap(),
+            Expr::Assign {
+                name: "x".to_string(),
+                id: Id::dummy(),
+                rhs: Box::new(Expr::IntegerLiteral { value: 1 }),
             }
         );
     }
