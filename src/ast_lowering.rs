@@ -159,7 +159,7 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
             let prev_bb_id = fctx.current_bb_id();
 
             let cond_bb_id = fctx.new_bb();
-            lower_expr(fctx, cond, result_var);
+            let cond_var = lower_expr2(fctx, cond);
 
             let body_bb_id = fctx.new_bb();
             lower_expr(fctx, body, result_var);
@@ -173,7 +173,7 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
             fctx.push_at(
                 cond_bb_id,
                 sir::Inst::new(sir::InstKind::Branch {
-                    cond: result_var,
+                    cond: cond_var,
                     branch_then: body_bb_id,
                     branch_else: cont_bb_id,
                 }),
@@ -182,6 +182,10 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
                 body_bb_id,
                 sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }),
             );
+            fctx.push(sir::Inst::new(sir::InstKind::Literal {
+                lhs: result_var,
+                value: sir::Literal::Unit,
+            }));
         }
         Expr::Block { stmts } => lower_stmts(fctx, stmts, result_var),
         Expr::Assign { name: _, id, rhs } => {
@@ -481,7 +485,9 @@ mod tests {
             function,
             sir::Function::describe(
                 0,
-                |desc, (x, tmp1, lt1, tmp2, tmp3, add1, tmp4, tmp5), (entry, cond, body, cont)| {
+                |desc,
+                 (x, tmp1, cond1, lt1, tmp2, tmp3, add1, tmp4, tmp5),
+                 (entry, cond, body, cont)| {
                     desc.block(
                         entry,
                         vec![insts::integer_literal(x, 42), insts::jump(cond)],
@@ -494,8 +500,8 @@ mod tests {
                             insts::copy(tmp3, x),
                             insts::push_arg(tmp2),
                             insts::push_arg(tmp3),
-                            insts::call(tmp1, lt1),
-                            insts::branch(tmp1, body, cont),
+                            insts::call(cond1, lt1),
+                            insts::branch(cond1, body, cont),
                         ],
                     );
                     desc.block(
@@ -511,7 +517,7 @@ mod tests {
                             insts::jump(cond),
                         ],
                     );
-                    desc.block(cont, vec![insts::return_(tmp1)]);
+                    desc.block(cont, vec![insts::unit_literal(tmp1), insts::return_(tmp1)]);
                 }
             )
         );
