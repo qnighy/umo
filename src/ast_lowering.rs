@@ -107,8 +107,8 @@ fn lower_stmt(fctx: &mut FunctionContext<'_>, stmt: &Stmt, result_var: Option<us
 
 fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
     match expr {
-        Expr::Var { name: _, id } => {
-            let builtin = fctx.builtin_ids.builtins.get(id).copied();
+        Expr::Var { ident } => {
+            let builtin = fctx.builtin_ids.builtins.get(&ident.id).copied();
             if let Some(builtin) = builtin {
                 fctx.push(sir::Inst::new(sir::InstKind::Builtin {
                     lhs: result_var,
@@ -118,7 +118,7 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
                     },
                 }));
             } else {
-                let var_id = fctx.var_id_map[id];
+                let var_id = fctx.var_id_map[&ident.id];
                 fctx.push(sir::Inst::new(sir::InstKind::Copy {
                     lhs: result_var,
                     rhs: var_id,
@@ -188,9 +188,9 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
             }));
         }
         Expr::Block { stmts } => lower_stmts(fctx, stmts, result_var),
-        Expr::Assign { name: _, id, rhs } => {
-            debug_assert!(!id.is_dummy());
-            let var_id = fctx.var_id_map[id];
+        Expr::Assign { lhs, rhs } => {
+            debug_assert!(!lhs.id.is_dummy());
+            let var_id = fctx.var_id_map[&lhs.id];
             lower_expr(fctx, rhs, var_id);
             fctx.push(sir::Inst::new(sir::InstKind::Literal {
                 lhs: result_var,
@@ -279,9 +279,9 @@ fn collect_vars_stmt(stmt: &Stmt, vars: &mut HashSet<Id>) {
 
 fn collect_vars_expr(expr: &Expr, vars: &mut HashSet<Id>) {
     match expr {
-        Expr::Var { name: _, id } => {
-            debug_assert!(!id.is_dummy());
-            vars.insert(*id);
+        Expr::Var { ident } => {
+            debug_assert!(!ident.id.is_dummy());
+            vars.insert(ident.id);
         }
         Expr::Branch { cond, then, else_ } => {
             collect_vars_expr(cond, vars);
@@ -293,9 +293,9 @@ fn collect_vars_expr(expr: &Expr, vars: &mut HashSet<Id>) {
             collect_vars_expr(body, vars);
         }
         Expr::Block { stmts } => collect_vars_stmts(stmts, vars),
-        Expr::Assign { name: _, id, rhs } => {
-            debug_assert!(!id.is_dummy());
-            vars.insert(*id);
+        Expr::Assign { lhs, rhs } => {
+            debug_assert!(!lhs.id.is_dummy());
+            vars.insert(lhs.id);
             collect_vars_expr(rhs, vars);
         }
         Expr::Call { callee, args } => {

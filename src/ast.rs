@@ -3,6 +3,21 @@ use std::collections::HashMap;
 use crate::cctx::{CCtx, Id};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Ident {
+    pub name: String,
+    pub id: Id,
+}
+
+impl From<&str> for Ident {
+    fn from(name: &str) -> Self {
+        Ident {
+            name: name.to_owned(),
+            id: Id::dummy(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Stmt {
     Let { name: String, id: Id, init: Expr },
     Expr { expr: Expr, use_value: bool },
@@ -11,8 +26,7 @@ pub enum Stmt {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     Var {
-        name: String,
-        id: Id,
+        ident: Ident,
     },
     Branch {
         cond: Box<Expr>,
@@ -27,8 +41,7 @@ pub enum Expr {
         stmts: Vec<Stmt>,
     },
     Assign {
-        name: String,
-        id: Id,
+        lhs: Ident,
         rhs: Box<Expr>,
     },
     Call {
@@ -152,12 +165,12 @@ fn assign_id_stmt(cctx: &CCtx, scope: &mut Scope, stmt: &mut Stmt) {
 
 fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
     match expr {
-        Expr::Var { name, id } => {
-            if let Some(&found_id) = scope.bindings.get(name) {
-                *id = found_id;
+        Expr::Var { ident } => {
+            if let Some(&found_id) = scope.bindings.get(&ident.name) {
+                ident.id = found_id;
             } else {
                 // TODO: better error handling
-                panic!("undefined variable: {}", name);
+                panic!("undefined variable: {}", ident.name);
             }
         }
         Expr::Branch { cond, then, else_ } => {
@@ -172,13 +185,13 @@ fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
         Expr::Block { stmts } => {
             assign_id_stmts(cctx, scope, stmts);
         }
-        Expr::Assign { name, id, rhs } => {
+        Expr::Assign { lhs, rhs } => {
             assign_id_expr(cctx, scope, rhs);
-            if let Some(&found_id) = scope.bindings.get(name) {
-                *id = found_id;
+            if let Some(&found_id) = scope.bindings.get(&lhs.name) {
+                lhs.id = found_id;
             } else {
                 // TODO: better error handling
-                panic!("undefined variable: {}", name);
+                panic!("undefined variable: {}", lhs.name);
             }
         }
         Expr::Call { callee, args } => {
@@ -228,8 +241,7 @@ pub mod testing {
 
         pub fn var(name: &str) -> Expr {
             Expr::Var {
-                name: name.to_string(),
-                id: Id::dummy(),
+                ident: Ident::from(name),
             }
         }
 
@@ -254,8 +266,7 @@ pub mod testing {
 
         pub fn assign(name: &str, rhs: Expr) -> Expr {
             Expr::Assign {
-                name: name.to_string(),
-                id: Id::dummy(),
+                lhs: Ident::from(name),
                 rhs: Box::new(rhs),
             }
         }

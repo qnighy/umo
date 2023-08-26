@@ -1,4 +1,4 @@
-use crate::ast::{BinOp, Expr, Stmt};
+use crate::ast::{BinOp, Expr, Ident, Stmt};
 use crate::cctx::Id;
 
 #[derive(Debug)]
@@ -138,13 +138,12 @@ impl Parser {
         match tok.kind {
             TokenKind::Equal => {
                 self.bump();
-                let Expr::Var { name, id: _ } = e else {
+                let Expr::Var { ident } = e else {
                     return Err(ParseError);
                 };
                 let rhs = self.parse_expr()?;
                 return Ok(Expr::Assign {
-                    name,
-                    id: Id::dummy(),
+                    lhs: ident,
                     rhs: Box::new(rhs),
                 });
             }
@@ -229,8 +228,7 @@ impl Parser {
                 self.bump();
                 let name = std::str::from_utf8(&self.buf[tok.begin..tok.end]).unwrap();
                 Ok(Expr::Var {
-                    name: name.to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from(name),
                 })
             }
             TokenKind::KeywordDo => {
@@ -490,8 +488,7 @@ mod tests {
         assert_eq!(
             Parser::new("x").parse_expr().unwrap(),
             Expr::Var {
-                name: "x".to_string(),
-                id: Id::dummy(),
+                ident: Ident::from("x"),
             }
         );
     }
@@ -501,8 +498,7 @@ mod tests {
         assert_eq!(
             Parser::new("(x)").parse_expr().unwrap(),
             Expr::Var {
-                name: "x".to_string(),
-                id: Id::dummy(),
+                ident: Ident::from("x"),
             }
         );
     }
@@ -535,8 +531,7 @@ mod tests {
             Parser::new("f()").parse_expr().unwrap(),
             Expr::Call {
                 callee: Box::new(Expr::Var {
-                    name: "f".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("f"),
                 }),
                 args: vec![],
             }
@@ -545,12 +540,10 @@ mod tests {
             Parser::new("f(x)").parse_expr().unwrap(),
             Expr::Call {
                 callee: Box::new(Expr::Var {
-                    name: "f".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("f"),
                 }),
                 args: vec![Expr::Var {
-                    name: "x".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("x"),
                 }],
             }
         );
@@ -558,17 +551,14 @@ mod tests {
             Parser::new("f(x, y)").parse_expr().unwrap(),
             Expr::Call {
                 callee: Box::new(Expr::Var {
-                    name: "f".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("f"),
                 }),
                 args: vec![
                     Expr::Var {
-                        name: "x".to_string(),
-                        id: Id::dummy(),
+                        ident: Ident::from("x"),
                     },
                     Expr::Var {
-                        name: "y".to_string(),
-                        id: Id::dummy(),
+                        ident: Ident::from("y"),
                     }
                 ],
             }
@@ -581,14 +571,12 @@ mod tests {
             Parser::new("if x { y; } else { z; }").parse_expr().unwrap(),
             Expr::Branch {
                 cond: Box::new(Expr::Var {
-                    name: "x".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("x"),
                 }),
                 then: Box::new(Expr::Block {
                     stmts: vec![Stmt::Expr {
                         expr: Expr::Var {
-                            name: "y".to_string(),
-                            id: Id::dummy(),
+                            ident: Ident::from("y"),
                         },
                         use_value: false,
                     }],
@@ -596,8 +584,7 @@ mod tests {
                 else_: Box::new(Expr::Block {
                     stmts: vec![Stmt::Expr {
                         expr: Expr::Var {
-                            name: "z".to_string(),
-                            id: Id::dummy(),
+                            ident: Ident::from("z"),
                         },
                         use_value: false,
                     }],
@@ -612,14 +599,12 @@ mod tests {
             Parser::new("if x { y; }").parse_expr().unwrap(),
             Expr::Branch {
                 cond: Box::new(Expr::Var {
-                    name: "x".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("x"),
                 }),
                 then: Box::new(Expr::Block {
                     stmts: vec![Stmt::Expr {
                         expr: Expr::Var {
-                            name: "y".to_string(),
-                            id: Id::dummy(),
+                            ident: Ident::from("y"),
                         },
                         use_value: false,
                     }],
@@ -635,16 +620,13 @@ mod tests {
             Parser::new("if x then y else z").parse_expr().unwrap(),
             Expr::Branch {
                 cond: Box::new(Expr::Var {
-                    name: "x".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("x"),
                 }),
                 then: Box::new(Expr::Var {
-                    name: "y".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("y"),
                 }),
                 else_: Box::new(Expr::Var {
-                    name: "z".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("z"),
                 }),
             }
         );
@@ -656,14 +638,12 @@ mod tests {
             Parser::new("while x { y; }").parse_expr().unwrap(),
             Expr::While {
                 cond: Box::new(Expr::Var {
-                    name: "x".to_string(),
-                    id: Id::dummy(),
+                    ident: Ident::from("x"),
                 }),
                 body: Box::new(Expr::Block {
                     stmts: vec![Stmt::Expr {
                         expr: Expr::Var {
-                            name: "y".to_string(),
-                            id: Id::dummy(),
+                            ident: Ident::from("y"),
                         },
                         use_value: false,
                     }],
@@ -679,8 +659,7 @@ mod tests {
             Expr::Block {
                 stmts: vec![Stmt::Expr {
                     expr: Expr::Var {
-                        name: "x".to_string(),
-                        id: Id::dummy(),
+                        ident: Ident::from("x"),
                     },
                     use_value: false,
                 }],
@@ -717,8 +696,7 @@ mod tests {
         assert_eq!(
             Parser::new("x = 1").parse_expr().unwrap(),
             Expr::Assign {
-                name: "x".to_string(),
-                id: Id::dummy(),
+                lhs: Ident::from("x"),
                 rhs: Box::new(Expr::IntegerLiteral { value: 1 }),
             }
         );
@@ -770,8 +748,7 @@ mod tests {
                 },
                 Stmt::Expr {
                     expr: Expr::Var {
-                        name: "x".to_string(),
-                        id: Id::dummy(),
+                        ident: Ident::from("x"),
                     },
                     use_value: true,
                 }
@@ -793,8 +770,7 @@ mod tests {
                 },
                 Stmt::Expr {
                     expr: Expr::Var {
-                        name: "x".to_string(),
-                        id: Id::dummy(),
+                        ident: Ident::from("x"),
                     },
                     use_value: true,
                 }
