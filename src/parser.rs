@@ -1,5 +1,4 @@
 use crate::ast::{BinOp, Expr, Ident, Stmt};
-use crate::cctx::Id;
 
 #[derive(Debug)]
 pub struct ParseError;
@@ -72,8 +71,7 @@ impl Parser {
                 }
                 self.bump();
                 Ok(Stmt::Let {
-                    name,
-                    id: Id::dummy(),
+                    lhs: Ident::from(name),
                     init,
                 })
             }
@@ -707,8 +705,7 @@ mod tests {
         assert_eq!(
             Parser::new("let x = 1;").parse_stmt().unwrap(),
             Stmt::Let {
-                name: "x".to_string(),
-                id: Id::dummy(),
+                lhs: Ident::from("x"),
                 init: Expr::IntegerLiteral { value: 1 },
             }
         );
@@ -742,8 +739,7 @@ mod tests {
             Parser::new("let x = 1; then x;").parse_stmts().unwrap(),
             vec![
                 Stmt::Let {
-                    name: "x".to_string(),
-                    id: Id::dummy(),
+                    lhs: Ident::from("x"),
                     init: Expr::IntegerLiteral { value: 1 },
                 },
                 Stmt::Expr {
@@ -764,8 +760,7 @@ mod tests {
                 .unwrap(),
             vec![
                 Stmt::Let {
-                    name: "x".to_string(),
-                    id: Id::dummy(),
+                    lhs: Ident::from("x"),
                     init: Expr::IntegerLiteral { value: 1 },
                 },
                 Stmt::Expr {

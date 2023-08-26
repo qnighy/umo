@@ -73,10 +73,10 @@ fn lower_stmts(fctx: &mut FunctionContext<'_>, stmts: &[Stmt], result_var: usize
 
 fn lower_stmt(fctx: &mut FunctionContext<'_>, stmt: &Stmt, result_var: Option<usize>) {
     match stmt {
-        Stmt::Let { name: _, id, init } => {
-            debug_assert!(!id.is_dummy());
+        Stmt::Let { lhs, init } => {
+            debug_assert!(!lhs.id.is_dummy());
 
-            let var_id = fctx.var_id_map[id];
+            let var_id = fctx.var_id_map[&lhs.id];
             lower_expr(fctx, init, var_id);
             if let Some(result_var) = result_var {
                 fctx.push(sir::Inst::new(sir::InstKind::Literal {
@@ -266,9 +266,9 @@ fn collect_vars_stmts(stmts: &[Stmt], vars: &mut HashSet<Id>) {
 
 fn collect_vars_stmt(stmt: &Stmt, vars: &mut HashSet<Id>) {
     match stmt {
-        Stmt::Let { name: _, id, init } => {
-            debug_assert!(!id.is_dummy());
-            vars.insert(*id);
+        Stmt::Let { lhs, init } => {
+            debug_assert!(!lhs.id.is_dummy());
+            vars.insert(lhs.id);
             collect_vars_expr(init, vars);
         }
         Stmt::Expr { expr, use_value: _ } => {

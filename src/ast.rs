@@ -16,10 +16,18 @@ impl From<&str> for Ident {
         }
     }
 }
+impl From<String> for Ident {
+    fn from(name: String) -> Self {
+        Ident {
+            name,
+            id: Id::dummy(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Stmt {
-    Let { name: String, id: Id, init: Expr },
+    Let { lhs: Ident, init: Expr },
     Expr { expr: Expr, use_value: bool },
 }
 
@@ -152,10 +160,10 @@ pub fn assign_id_stmts(cctx: &CCtx, scope: &mut Scope, stmts: &mut Vec<Stmt>) {
 
 fn assign_id_stmt(cctx: &CCtx, scope: &mut Scope, stmt: &mut Stmt) {
     match stmt {
-        Stmt::Let { name, id, init } => {
+        Stmt::Let { lhs, init } => {
             assign_id_expr(cctx, scope, init);
-            *id = cctx.id_gen.fresh();
-            scope.insert(name, *id);
+            lhs.id = cctx.id_gen.fresh();
+            scope.insert(&lhs.name, lhs.id);
         }
         Stmt::Expr { expr, .. } => {
             assign_id_expr(cctx, scope, expr);
@@ -216,8 +224,7 @@ pub mod testing {
 
         pub fn let_(name: &str, init: Expr) -> Stmt {
             Stmt::Let {
-                name: name.to_string(),
-                id: Id::dummy(),
+                lhs: Ident::from(name),
                 init,
             }
         }
