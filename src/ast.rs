@@ -1,11 +1,30 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use crate::cctx::{CCtx, Id};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Ident {
     pub name: String,
     pub id: Id,
+}
+
+impl Ident {
+    pub fn with_id(self, id: Id) -> Self {
+        Ident { id, ..self }
+    }
+}
+
+impl fmt::Debug for Ident {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.id.is_dummy() {
+            f.debug_tuple("Ident::from").field(&self.name).finish()
+        } else {
+            f.debug_tuple("Ident::from").field(&self.name).finish()?;
+            f.debug_tuple(".with_id").field(&self.id).finish()?;
+            Ok(())
+        }
+    }
 }
 
 impl From<&str> for Ident {
@@ -25,10 +44,32 @@ impl From<String> for Ident {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Stmt {
     Let { lhs: Ident, init: Expr },
     Expr { expr: Expr, use_value: bool },
+}
+
+impl Stmt {
+    pub fn let_(lhs: Ident, init: Expr) -> Self {
+        Stmt::Let { lhs, init }
+    }
+    pub fn expr(expr: Expr, use_value: bool) -> Self {
+        Stmt::Expr { expr, use_value }
+    }
+}
+
+impl fmt::Debug for Stmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Stmt::Let { lhs, init } => f.debug_tuple("Stmt:let_").field(lhs).field(init).finish(),
+            Stmt::Expr { expr, use_value } => f
+                .debug_tuple("Stmt::expr")
+                .field(expr)
+                .field(use_value)
+                .finish(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

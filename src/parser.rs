@@ -70,10 +70,7 @@ impl Parser {
                     return Err(ParseError);
                 }
                 self.bump();
-                Ok(Stmt::Let {
-                    lhs: Ident::from(name),
-                    init,
-                })
+                Ok(Stmt::let_(Ident::from(name), init))
             }
             TokenKind::KeywordThen => {
                 self.bump();
@@ -83,10 +80,7 @@ impl Parser {
                     return Err(ParseError);
                 }
                 self.bump();
-                Ok(Stmt::Expr {
-                    expr,
-                    use_value: true,
-                })
+                Ok(Stmt::expr(expr, true))
             }
             _ => {
                 let expr = self.parse_expr()?;
@@ -95,10 +89,7 @@ impl Parser {
                     return Err(ParseError);
                 }
                 self.bump();
-                Ok(Stmt::Expr {
-                    expr,
-                    use_value: false,
-                })
+                Ok(Stmt::expr(expr, false))
             }
         }
     }
@@ -572,20 +563,20 @@ mod tests {
                     ident: Ident::from("x"),
                 }),
                 then: Box::new(Expr::Block {
-                    stmts: vec![Stmt::Expr {
-                        expr: Expr::Var {
+                    stmts: vec![Stmt::expr(
+                        Expr::Var {
                             ident: Ident::from("y"),
                         },
-                        use_value: false,
-                    }],
+                        false,
+                    )],
                 }),
                 else_: Box::new(Expr::Block {
-                    stmts: vec![Stmt::Expr {
-                        expr: Expr::Var {
+                    stmts: vec![Stmt::expr(
+                        Expr::Var {
                             ident: Ident::from("z"),
                         },
-                        use_value: false,
-                    }],
+                        false,
+                    )],
                 }),
             }
         );
@@ -600,12 +591,12 @@ mod tests {
                     ident: Ident::from("x"),
                 }),
                 then: Box::new(Expr::Block {
-                    stmts: vec![Stmt::Expr {
-                        expr: Expr::Var {
+                    stmts: vec![Stmt::expr(
+                        Expr::Var {
                             ident: Ident::from("y"),
                         },
-                        use_value: false,
-                    }],
+                        false,
+                    )],
                 }),
                 else_: Box::new(Expr::Block { stmts: vec![] }),
             }
@@ -639,12 +630,12 @@ mod tests {
                     ident: Ident::from("x"),
                 }),
                 body: Box::new(Expr::Block {
-                    stmts: vec![Stmt::Expr {
-                        expr: Expr::Var {
+                    stmts: vec![Stmt::expr(
+                        Expr::Var {
                             ident: Ident::from("y"),
                         },
-                        use_value: false,
-                    }],
+                        false,
+                    )],
                 }),
             }
         );
@@ -655,12 +646,12 @@ mod tests {
         assert_eq!(
             Parser::new("do { x; }").parse_expr().unwrap(),
             Expr::Block {
-                stmts: vec![Stmt::Expr {
-                    expr: Expr::Var {
+                stmts: vec![Stmt::expr(
+                    Expr::Var {
                         ident: Ident::from("x"),
                     },
-                    use_value: false,
-                }],
+                    false,
+                )],
             }
         );
     }
@@ -704,10 +695,7 @@ mod tests {
     fn test_parse_let_stmt() {
         assert_eq!(
             Parser::new("let x = 1;").parse_stmt().unwrap(),
-            Stmt::Let {
-                lhs: Ident::from("x"),
-                init: Expr::IntegerLiteral { value: 1 },
-            }
+            Stmt::let_(Ident::from("x"), Expr::IntegerLiteral { value: 1 })
         );
     }
 
@@ -715,10 +703,7 @@ mod tests {
     fn test_parse_then_stmt() {
         assert_eq!(
             Parser::new("then 1;").parse_stmt().unwrap(),
-            Stmt::Expr {
-                expr: Expr::IntegerLiteral { value: 1 },
-                use_value: true,
-            }
+            Stmt::expr(Expr::IntegerLiteral { value: 1 }, true)
         );
     }
 
@@ -726,10 +711,7 @@ mod tests {
     fn test_parse_expr_stmt() {
         assert_eq!(
             Parser::new("1;").parse_stmt().unwrap(),
-            Stmt::Expr {
-                expr: Expr::IntegerLiteral { value: 1 },
-                use_value: false,
-            }
+            Stmt::expr(Expr::IntegerLiteral { value: 1 }, false)
         );
     }
 
@@ -738,16 +720,13 @@ mod tests {
         assert_eq!(
             Parser::new("let x = 1; then x;").parse_stmts().unwrap(),
             vec![
-                Stmt::Let {
-                    lhs: Ident::from("x"),
-                    init: Expr::IntegerLiteral { value: 1 },
-                },
-                Stmt::Expr {
-                    expr: Expr::Var {
+                Stmt::let_(Ident::from("x"), Expr::IntegerLiteral { value: 1 }),
+                Stmt::expr(
+                    Expr::Var {
                         ident: Ident::from("x"),
                     },
-                    use_value: true,
-                }
+                    true
+                )
             ]
         );
     }
@@ -759,16 +738,13 @@ mod tests {
                 .parse_program()
                 .unwrap(),
             vec![
-                Stmt::Let {
-                    lhs: Ident::from("x"),
-                    init: Expr::IntegerLiteral { value: 1 },
-                },
-                Stmt::Expr {
-                    expr: Expr::Var {
+                Stmt::let_(Ident::from("x"), Expr::IntegerLiteral { value: 1 }),
+                Stmt::expr(
+                    Expr::Var {
                         ident: Ident::from("x"),
                     },
-                    use_value: true,
-                }
+                    true
+                )
             ]
         );
     }

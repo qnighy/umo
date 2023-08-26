@@ -1,5 +1,6 @@
 // Compiler Context
 
+use std::fmt;
 use std::sync::atomic::{self, AtomicUsize};
 use std::sync::Arc;
 
@@ -35,7 +36,7 @@ impl IdGen {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Id {
     pub number: usize,
 }
@@ -47,6 +48,16 @@ impl Id {
 
     pub fn is_dummy(&self) -> bool {
         self.number == 0
+    }
+}
+
+impl fmt::Debug for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_dummy() {
+            f.debug_tuple("Id::dummy").finish()
+        } else {
+            f.debug_struct("Id").field("number", &self.number).finish()
+        }
     }
 }
 
