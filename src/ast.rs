@@ -72,7 +72,7 @@ impl fmt::Debug for Stmt {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
     Var {
         ident: Ident,
@@ -109,6 +109,93 @@ pub enum Expr {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
+}
+
+impl Expr {
+    pub fn var(ident: Ident) -> Self {
+        Expr::Var { ident }
+    }
+    pub fn branch(cond: Expr, then: Expr, else_: Expr) -> Self {
+        Expr::Branch {
+            cond: Box::new(cond),
+            then: Box::new(then),
+            else_: Box::new(else_),
+        }
+    }
+    pub fn while_(cond: Expr, body: Expr) -> Self {
+        Expr::While {
+            cond: Box::new(cond),
+            body: Box::new(body),
+        }
+    }
+    pub fn block(stmts: Vec<Stmt>) -> Self {
+        Expr::Block { stmts }
+    }
+    pub fn assign(lhs: Ident, rhs: Expr) -> Self {
+        Expr::Assign {
+            lhs,
+            rhs: Box::new(rhs),
+        }
+    }
+    pub fn call(callee: Expr, args: Vec<Expr>) -> Self {
+        Expr::Call {
+            callee: Box::new(callee),
+            args,
+        }
+    }
+    pub fn integer_literal(value: i32) -> Self {
+        Expr::IntegerLiteral { value }
+    }
+    pub fn string_literal(value: String) -> Self {
+        Expr::StringLiteral { value }
+    }
+    pub fn bin_op(op: BinOp, lhs: Expr, rhs: Expr) -> Self {
+        Expr::BinOp {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+}
+
+impl fmt::Debug for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expr::Var { ident } => f.debug_tuple("Expr::var").field(ident).finish(),
+            Expr::Branch { cond, then, else_ } => f
+                .debug_tuple("Expr::branch")
+                .field(cond)
+                .field(then)
+                .field(else_)
+                .finish(),
+            Expr::While { cond, body } => f
+                .debug_tuple("Expr::while_")
+                .field(cond)
+                .field(body)
+                .finish(),
+            Expr::Block { stmts } => f.debug_tuple("Expr::block").field(stmts).finish(),
+            Expr::Assign { lhs, rhs } => {
+                f.debug_tuple("Expr::assign").field(lhs).field(rhs).finish()
+            }
+            Expr::Call { callee, args } => f
+                .debug_tuple("Expr::call")
+                .field(callee)
+                .field(args)
+                .finish(),
+            Expr::IntegerLiteral { value } => {
+                f.debug_tuple("Expr::integer_literal").field(value).finish()
+            }
+            Expr::StringLiteral { value } => {
+                f.debug_tuple("Expr::string_literal").field(value).finish()
+            }
+            Expr::BinOp { op, lhs, rhs } => f
+                .debug_tuple("Expr::bin_op")
+                .field(op)
+                .field(lhs)
+                .field(rhs)
+                .finish(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

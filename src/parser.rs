@@ -131,10 +131,7 @@ impl Parser {
                     return Err(ParseError);
                 };
                 let rhs = self.parse_expr()?;
-                return Ok(Expr::Assign {
-                    lhs: ident,
-                    rhs: Box::new(rhs),
-                });
+                return Ok(Expr::assign(ident, rhs));
             }
             _ => {}
         }
@@ -150,11 +147,7 @@ impl Parser {
             };
             self.bump();
             let rhs = self.parse_expr_additive()?;
-            e = Expr::BinOp {
-                op: bin_op,
-                lhs: Box::new(e),
-                rhs: Box::new(rhs),
-            };
+            e = Expr::bin_op(bin_op, e, rhs);
         }
         Ok(e)
     }
@@ -168,11 +161,7 @@ impl Parser {
             };
             self.bump();
             let rhs = self.parse_expr_call()?;
-            e = Expr::BinOp {
-                op: bin_op,
-                lhs: Box::new(e),
-                rhs: Box::new(rhs),
-            };
+            e = Expr::bin_op(bin_op, e, rhs);
         }
         Ok(e)
     }
@@ -189,10 +178,7 @@ impl Parser {
                         return Err(ParseError);
                     }
                     self.bump();
-                    e = Expr::Call {
-                        callee: Box::new(e),
-                        args,
-                    };
+                    e = Expr::call(e, args);
                 }
                 _ => {
                     break;
@@ -216,9 +202,7 @@ impl Parser {
             TokenKind::Identifier => {
                 self.bump();
                 let name = std::str::from_utf8(&self.buf[tok.begin..tok.end]).unwrap();
-                Ok(Expr::Var {
-                    ident: Ident::from(name),
-                })
+                Ok(Expr::var(Ident::from(name)))
             }
             TokenKind::KeywordDo => {
                 // do { <stmts> }
@@ -241,11 +225,7 @@ impl Parser {
                         self.bump();
                         // TODO: primary should not be right-open
                         let else_ = self.parse_expr_primary()?;
-                        Ok(Expr::Branch {
-                            cond: Box::new(cond),
-                            then: Box::new(then),
-                            else_: Box::new(else_),
-                        })
+                        Ok(Expr::branch(cond, then, else_))
                     }
                     TokenKind::LBrace => {
                         let then = self.parse_block_expr()?;
@@ -258,18 +238,10 @@ impl Parser {
                             self.bump();
                             // TODO: also handle else-if exceptions
                             let else_ = self.parse_block_expr()?;
-                            Ok(Expr::Branch {
-                                cond: Box::new(cond),
-                                then: Box::new(then),
-                                else_: Box::new(else_),
-                            })
+                            Ok(Expr::branch(cond, then, else_))
                         } else {
                             // if <cond> { <then> }
-                            Ok(Expr::Branch {
-                                cond: Box::new(cond),
-                                then: Box::new(then),
-                                else_: Box::new(Expr::Block { stmts: vec![] }),
-                            })
+                            Ok(Expr::branch(cond, then, Expr::block(vec![])))
                         }
                     }
                     _ => return Err(ParseError),
@@ -284,23 +256,18 @@ impl Parser {
                     return Err(ParseError);
                 }
                 let body = self.parse_block_expr()?;
-                Ok(Expr::While {
-                    cond: Box::new(cond),
-                    body: Box::new(body),
-                })
+                Ok(Expr::while_(cond, body))
             }
             TokenKind::Integer => {
                 self.bump();
                 let s = std::str::from_utf8(&self.buf[tok.begin..tok.end]).unwrap();
                 let value = s.parse::<i32>().unwrap();
-                Ok(Expr::IntegerLiteral { value })
+                Ok(Expr::integer_literal(value))
             }
             TokenKind::String => {
                 self.bump();
                 let s = std::str::from_utf8(&self.buf[tok.begin + 1..tok.end - 1]).unwrap();
-                Ok(Expr::StringLiteral {
-                    value: s.to_string(),
-                })
+                Ok(Expr::string_literal(s.to_owned()))
             }
             _ => Err(ParseError),
         }
@@ -317,7 +284,7 @@ impl Parser {
             return Err(ParseError);
         }
         self.bump();
-        Ok(Expr::Block { stmts })
+        Ok(Expr::block(stmts))
     }
     fn expect_eof(&mut self) -> Result<(), ParseError> {
         let tok = self.next_token()?;
@@ -476,9 +443,7 @@ mod tests {
     fn test_parse_var_ref() {
         assert_eq!(
             Parser::new("x").parse_expr().unwrap(),
-            Expr::Var {
-                ident: Ident::from("x"),
-            }
+            Expr::var(Ident::from("x"))
         );
     }
 
@@ -486,9 +451,7 @@ mod tests {
     fn test_parse_paren() {
         assert_eq!(
             Parser::new("(x)").parse_expr().unwrap(),
-            Expr::Var {
-                ident: Ident::from("x"),
-            }
+            Expr::var(Ident::from("x"))
         );
     }
 
@@ -496,11 +459,11 @@ mod tests {
     fn test_parse_integer_literal() {
         assert_eq!(
             Parser::new("1").parse_expr().unwrap(),
-            Expr::IntegerLiteral { value: 1 }
+            Expr::integer_literal(1)
         );
         assert_eq!(
             Parser::new("123").parse_expr().unwrap(),
-            Expr::IntegerLiteral { value: 123 }
+            Expr::integer_literal(123)
         );
     }
 
@@ -508,9 +471,7 @@ mod tests {
     fn test_parse_string_literal() {
         assert_eq!(
             Parser::new("\"hello\"").parse_expr().unwrap(),
-            Expr::StringLiteral {
-                value: "hello".to_string()
-            }
+            Expr::string_literal("hello".to_string())
         );
     }
 
@@ -518,39 +479,21 @@ mod tests {
     fn test_parse_funcall() {
         assert_eq!(
             Parser::new("f()").parse_expr().unwrap(),
-            Expr::Call {
-                callee: Box::new(Expr::Var {
-                    ident: Ident::from("f"),
-                }),
-                args: vec![],
-            }
+            Expr::call(Expr::var(Ident::from("f")), vec![])
         );
         assert_eq!(
             Parser::new("f(x)").parse_expr().unwrap(),
-            Expr::Call {
-                callee: Box::new(Expr::Var {
-                    ident: Ident::from("f"),
-                }),
-                args: vec![Expr::Var {
-                    ident: Ident::from("x"),
-                }],
-            }
+            Expr::call(
+                Expr::var(Ident::from("f")),
+                vec![Expr::var(Ident::from("x"))]
+            )
         );
         assert_eq!(
             Parser::new("f(x, y)").parse_expr().unwrap(),
-            Expr::Call {
-                callee: Box::new(Expr::Var {
-                    ident: Ident::from("f"),
-                }),
-                args: vec![
-                    Expr::Var {
-                        ident: Ident::from("x"),
-                    },
-                    Expr::Var {
-                        ident: Ident::from("y"),
-                    }
-                ],
-            }
+            Expr::call(
+                Expr::var(Ident::from("f")),
+                vec![Expr::var(Ident::from("x")), Expr::var(Ident::from("y"))]
+            )
         );
     }
 
@@ -558,27 +501,11 @@ mod tests {
     fn test_parse_if_else_in_block_style() {
         assert_eq!(
             Parser::new("if x { y; } else { z; }").parse_expr().unwrap(),
-            Expr::Branch {
-                cond: Box::new(Expr::Var {
-                    ident: Ident::from("x"),
-                }),
-                then: Box::new(Expr::Block {
-                    stmts: vec![Stmt::expr(
-                        Expr::Var {
-                            ident: Ident::from("y"),
-                        },
-                        false,
-                    )],
-                }),
-                else_: Box::new(Expr::Block {
-                    stmts: vec![Stmt::expr(
-                        Expr::Var {
-                            ident: Ident::from("z"),
-                        },
-                        false,
-                    )],
-                }),
-            }
+            Expr::branch(
+                Expr::var(Ident::from("x")),
+                Expr::block(vec![Stmt::expr(Expr::var(Ident::from("y")), false)]),
+                Expr::block(vec![Stmt::expr(Expr::var(Ident::from("z")), false)])
+            )
         );
     }
 
@@ -586,20 +513,11 @@ mod tests {
     fn test_parse_if_without_else_in_block_style() {
         assert_eq!(
             Parser::new("if x { y; }").parse_expr().unwrap(),
-            Expr::Branch {
-                cond: Box::new(Expr::Var {
-                    ident: Ident::from("x"),
-                }),
-                then: Box::new(Expr::Block {
-                    stmts: vec![Stmt::expr(
-                        Expr::Var {
-                            ident: Ident::from("y"),
-                        },
-                        false,
-                    )],
-                }),
-                else_: Box::new(Expr::Block { stmts: vec![] }),
-            }
+            Expr::branch(
+                Expr::var(Ident::from("x")),
+                Expr::block(vec![Stmt::expr(Expr::var(Ident::from("y")), false)]),
+                Expr::block(vec![])
+            )
         );
     }
 
@@ -607,17 +525,11 @@ mod tests {
     fn test_parse_if_then_else() {
         assert_eq!(
             Parser::new("if x then y else z").parse_expr().unwrap(),
-            Expr::Branch {
-                cond: Box::new(Expr::Var {
-                    ident: Ident::from("x"),
-                }),
-                then: Box::new(Expr::Var {
-                    ident: Ident::from("y"),
-                }),
-                else_: Box::new(Expr::Var {
-                    ident: Ident::from("z"),
-                }),
-            }
+            Expr::branch(
+                Expr::var(Ident::from("x")),
+                Expr::var(Ident::from("y")),
+                Expr::var(Ident::from("z"))
+            )
         );
     }
 
@@ -625,19 +537,10 @@ mod tests {
     fn test_parse_while() {
         assert_eq!(
             Parser::new("while x { y; }").parse_expr().unwrap(),
-            Expr::While {
-                cond: Box::new(Expr::Var {
-                    ident: Ident::from("x"),
-                }),
-                body: Box::new(Expr::Block {
-                    stmts: vec![Stmt::expr(
-                        Expr::Var {
-                            ident: Ident::from("y"),
-                        },
-                        false,
-                    )],
-                }),
-            }
+            Expr::while_(
+                Expr::var(Ident::from("x")),
+                Expr::block(vec![Stmt::expr(Expr::var(Ident::from("y")), false)])
+            )
         );
     }
 
@@ -645,14 +548,7 @@ mod tests {
     fn test_parse_do_expr() {
         assert_eq!(
             Parser::new("do { x; }").parse_expr().unwrap(),
-            Expr::Block {
-                stmts: vec![Stmt::expr(
-                    Expr::Var {
-                        ident: Ident::from("x"),
-                    },
-                    false,
-                )],
-            }
+            Expr::block(vec![Stmt::expr(Expr::var(Ident::from("x")), false)])
         );
     }
 
@@ -660,11 +556,11 @@ mod tests {
     fn test_parse_additive() {
         assert_eq!(
             Parser::new("1 + 2").parse_expr().unwrap(),
-            Expr::BinOp {
-                op: BinOp::Add,
-                lhs: Box::new(Expr::IntegerLiteral { value: 1 }),
-                rhs: Box::new(Expr::IntegerLiteral { value: 2 }),
-            }
+            Expr::bin_op(
+                BinOp::Add,
+                Expr::integer_literal(1),
+                Expr::integer_literal(2)
+            )
         );
     }
 
@@ -672,11 +568,11 @@ mod tests {
     fn test_parse_comparison() {
         assert_eq!(
             Parser::new("1 < 2").parse_expr().unwrap(),
-            Expr::BinOp {
-                op: BinOp::Lt,
-                lhs: Box::new(Expr::IntegerLiteral { value: 1 }),
-                rhs: Box::new(Expr::IntegerLiteral { value: 2 }),
-            }
+            Expr::bin_op(
+                BinOp::Lt,
+                Expr::integer_literal(1),
+                Expr::integer_literal(2)
+            )
         );
     }
 
@@ -684,10 +580,7 @@ mod tests {
     fn test_parse_assignment() {
         assert_eq!(
             Parser::new("x = 1").parse_expr().unwrap(),
-            Expr::Assign {
-                lhs: Ident::from("x"),
-                rhs: Box::new(Expr::IntegerLiteral { value: 1 }),
-            }
+            Expr::assign(Ident::from("x"), Expr::integer_literal(1),)
         );
     }
 
@@ -695,7 +588,7 @@ mod tests {
     fn test_parse_let_stmt() {
         assert_eq!(
             Parser::new("let x = 1;").parse_stmt().unwrap(),
-            Stmt::let_(Ident::from("x"), Expr::IntegerLiteral { value: 1 })
+            Stmt::let_(Ident::from("x"), Expr::integer_literal(1))
         );
     }
 
@@ -703,7 +596,7 @@ mod tests {
     fn test_parse_then_stmt() {
         assert_eq!(
             Parser::new("then 1;").parse_stmt().unwrap(),
-            Stmt::expr(Expr::IntegerLiteral { value: 1 }, true)
+            Stmt::expr(Expr::integer_literal(1), true)
         );
     }
 
@@ -711,7 +604,7 @@ mod tests {
     fn test_parse_expr_stmt() {
         assert_eq!(
             Parser::new("1;").parse_stmt().unwrap(),
-            Stmt::expr(Expr::IntegerLiteral { value: 1 }, false)
+            Stmt::expr(Expr::integer_literal(1), false)
         );
     }
 
@@ -720,13 +613,8 @@ mod tests {
         assert_eq!(
             Parser::new("let x = 1; then x;").parse_stmts().unwrap(),
             vec![
-                Stmt::let_(Ident::from("x"), Expr::IntegerLiteral { value: 1 }),
-                Stmt::expr(
-                    Expr::Var {
-                        ident: Ident::from("x"),
-                    },
-                    true
-                )
+                Stmt::let_(Ident::from("x"), Expr::integer_literal(1)),
+                Stmt::expr(Expr::var(Ident::from("x")), true)
             ]
         );
     }
@@ -738,13 +626,8 @@ mod tests {
                 .parse_program()
                 .unwrap(),
             vec![
-                Stmt::let_(Ident::from("x"), Expr::IntegerLiteral { value: 1 }),
-                Stmt::expr(
-                    Expr::Var {
-                        ident: Ident::from("x"),
-                    },
-                    true
-                )
+                Stmt::let_(Ident::from("x"), Expr::integer_literal(1)),
+                Stmt::expr(Expr::var(Ident::from("x")), true)
             ]
         );
     }
