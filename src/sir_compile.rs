@@ -276,7 +276,7 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::sir::testing::{FunctionTestingExt, ProgramUnitTestingExt};
+    use crate::sir::testing::ProgramUnitTestingExt;
     use crate::sir::{BuiltinKind, Inst};
 
     use super::*;
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn test_compile() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |[x, puts1, tmp1, tmp2]| {
             vec![
                 Inst::literal(x, "Hello, world!"),
                 Inst::builtin(puts1, BuiltinKind::Puts),
@@ -304,7 +304,7 @@ mod tests {
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2, tmp3)| {
+            ProgramUnit::simple(Function::simple(0, |[x, puts1, tmp1, tmp2, tmp3]| {
                 vec![
                     Inst::literal(x, "Hello, world!"),
                     Inst::builtin(puts1, BuiltinKind::Puts),
@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn test_compile_drop() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |[x, puts1, tmp1, tmp2]| {
             vec![
                 Inst::literal(x, "dummy"),
                 Inst::literal(x, "Hello, world!"),
@@ -345,7 +345,7 @@ mod tests {
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
+            ProgramUnit::simple(Function::simple(0, |[x, puts1, tmp1, tmp2]| {
                 vec![
                     Inst::literal(x, "dummy"),
                     Inst::drop(x),
@@ -364,13 +364,13 @@ mod tests {
     #[test]
     fn test_compile_drop_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(1, |(_arg1, tmp1)| {
+        let program_unit = ProgramUnit::simple(Function::simple(1, |[_arg1, tmp1]| {
             vec![Inst::literal(tmp1, ()), Inst::return_(tmp1)]
         }));
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
-            ProgramUnit::simple(Function::simple(1, |(arg, tmp1)| {
+            ProgramUnit::simple(Function::simple(1, |[arg, tmp1]| {
                 vec![
                     Inst::drop(arg),
                     Inst::literal(tmp1, ()),

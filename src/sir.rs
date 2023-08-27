@@ -4,6 +4,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::cctx::Id;
+use crate::util::SeqInit;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ProgramUnit {
@@ -33,24 +34,54 @@ impl Function {
             body,
         }
     }
+
+    pub fn describe<const NV: usize, const NB: usize, F>(num_args: usize, f: F) -> Self
+    where
+        F: FnOnce([usize; NV], [usize; NB]) -> Vec<(usize, Vec<Inst>)>,
+    {
+        let bbs_indexed = f(SeqInit::seq(), SeqInit::seq());
+        let mut function = Self::new(num_args, NV, vec![BasicBlock::default(); NB]);
+        for (i, (bb_id, insts)) in bbs_indexed.into_iter().enumerate() {
+            assert_eq!(
+                bb_id,
+                i,
+                "The {}th bb_id should be {}, got {}",
+                i + 1,
+                i,
+                bb_id
+            );
+            function.body[i] = BasicBlock::new(insts);
+        }
+        function
+    }
+
+    pub fn simple<const NV: usize, F>(num_args: usize, f: F) -> Self
+    where
+        F: FnOnce([usize; NV]) -> Vec<Inst>,
+    {
+        Self::new(num_args, NV, vec![BasicBlock::new(f(SeqInit::seq()))])
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
 pub struct BasicBlock {
     pub insts: Vec<Inst>,
 }
 
 impl BasicBlock {
-    pub fn new(insts: Vec<Inst>) -> Self {
-        assert!(insts.len() > 0);
-        assert!(insts[..insts.len() - 1].iter().all(|i| i.kind.is_middle()));
-        assert!(insts.last().unwrap().kind.is_tail());
-        Self { insts }
+    pub fn new<A>(insts: A) -> Self
+    where
+        A: Into<Vec<Inst>>,
+    {
+        Self {
+            insts: insts.into(),
+        }
     }
+}
 
-    pub fn new_partial(insts: Vec<Inst>) -> Self {
-        assert!(insts.iter().all(|i| i.kind.is_middle()));
-        Self { insts }
+impl fmt::Debug for BasicBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("BasicBlock::new").field(&self.insts).finish()
     }
 }
 
@@ -337,58 +368,6 @@ pub mod testing {
     impl ProgramUnitDescriber {
         pub fn function(&mut self, function_id: usize, function: Function) -> &mut Self {
             self.program_unit.functions[function_id] = function;
-            self
-        }
-    }
-
-    pub trait FunctionTestingExt {
-        fn describe<VS, BS, F>(num_args: usize, f: F) -> Self
-        where
-            VS: SeqGen,
-            BS: SeqGen,
-            F: FnOnce(&mut FunctionDescriber, VS, BS);
-
-        fn simple<VS, F>(num_args: usize, f: F) -> Self
-        where
-            VS: SeqGen,
-            F: FnOnce(VS) -> Vec<Inst>;
-    }
-
-    impl FunctionTestingExt for Function {
-        fn describe<VS, BS, F>(num_args: usize, f: F) -> Self
-        where
-            VS: SeqGen,
-            BS: SeqGen,
-            F: FnOnce(&mut FunctionDescriber, VS, BS),
-        {
-            let mut desc = FunctionDescriber {
-                function: Self::new(
-                    num_args,
-                    VS::size(),
-                    vec![BasicBlock::default(); BS::size()],
-                ),
-            };
-            f(&mut desc, VS::seq(), BS::seq());
-            desc.function
-        }
-
-        fn simple<VS, F>(num_args: usize, f: F) -> Self
-        where
-            VS: SeqGen,
-            F: FnOnce(VS) -> Vec<Inst>,
-        {
-            Self::new(num_args, VS::size(), vec![BasicBlock::new(f(VS::seq()))])
-        }
-    }
-
-    #[derive(Debug)]
-    pub struct FunctionDescriber {
-        function: Function,
-    }
-
-    impl FunctionDescriber {
-        pub fn block(&mut self, bb_id: usize, insts: Vec<Inst>) -> &mut Self {
-            self.function.body[bb_id] = BasicBlock::new(insts);
             self
         }
     }

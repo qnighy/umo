@@ -265,7 +265,6 @@ mod tests {
     use crate::ast::testing::{exprs, stmts};
     use crate::ast::{assign_id_stmts, Scope};
     use crate::cctx::CCtx;
-    use crate::sir::testing::FunctionTestingExt;
     use crate::sir::Inst;
 
     fn assign_id(cctx: &mut CCtx, builtin_ids: &BuiltinIds, mut stmts: Vec<Stmt>) -> Vec<Stmt> {
@@ -289,8 +288,8 @@ mod tests {
         let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
-            sir::Function::describe(0, |desc, (_tmp1, tmp2, tmp3, puts1, tmp4), (entry,)| {
-                desc.block(
+            sir::Function::describe(0, |[_tmp1, tmp2, tmp3, puts1, tmp4], [entry]| {
+                vec![(
                     entry,
                     vec![
                         Inst::builtin(puts1, sir::BuiltinKind::Puts),
@@ -300,7 +299,7 @@ mod tests {
                         Inst::literal(tmp2, ()),
                         Inst::return_(tmp2),
                     ],
-                );
+                )]
             })
         );
     }
@@ -320,8 +319,8 @@ mod tests {
         let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
-            sir::Function::describe(0, |desc, (tmp1, add1, tmp2, tmp3), (entry,)| {
-                desc.block(
+            sir::Function::describe(0, |[tmp1, add1, tmp2, tmp3], [entry]| {
+                vec![(
                     entry,
                     vec![
                         Inst::builtin(add1, sir::BuiltinKind::Add),
@@ -332,7 +331,7 @@ mod tests {
                         Inst::call(tmp1, add1),
                         Inst::return_(tmp1),
                     ],
-                );
+                )]
             })
         );
     }
@@ -352,15 +351,15 @@ mod tests {
         let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
-            sir::Function::describe(0, |desc, (x, tmp1), (entry,)| {
-                desc.block(
+            sir::Function::describe(0, |[x, tmp1], [entry]| {
+                vec![(
                     entry,
                     vec![
                         Inst::literal(x, 42),
                         Inst::copy(tmp1, x),
                         Inst::return_(tmp1),
                     ],
-                );
+                )]
             })
         );
     }
@@ -386,18 +385,20 @@ mod tests {
             function,
             sir::Function::describe(
                 0,
-                |desc, (x, tmp1, tmp2), (entry, branch_then, branch_else, cont)| {
-                    desc.block(
-                        entry,
-                        vec![
-                            Inst::literal(x, 42),
-                            Inst::copy(tmp2, x),
-                            Inst::branch(tmp2, branch_then, branch_else),
-                        ],
-                    );
-                    desc.block(branch_then, vec![Inst::literal(tmp1, 1), Inst::jump(cont)]);
-                    desc.block(branch_else, vec![Inst::literal(tmp1, 2), Inst::jump(cont)]);
-                    desc.block(cont, vec![Inst::return_(tmp1)]);
+                |[x, tmp1, tmp2], [entry, branch_then, branch_else, cont]| {
+                    vec![
+                        (
+                            entry,
+                            vec![
+                                Inst::literal(x, 42),
+                                Inst::copy(tmp2, x),
+                                Inst::branch(tmp2, branch_then, branch_else),
+                            ],
+                        ),
+                        (branch_then, vec![Inst::literal(tmp1, 1), Inst::jump(cont)]),
+                        (branch_else, vec![Inst::literal(tmp1, 2), Inst::jump(cont)]),
+                        (cont, vec![Inst::return_(tmp1)]),
+                    ]
                 }
             )
         );
@@ -426,36 +427,36 @@ mod tests {
             function,
             sir::Function::describe(
                 0,
-                |desc,
-                 (x, tmp1, cond1, lt1, tmp2, tmp3, add1, tmp4, tmp5),
-                 (entry, cond, body, cont)| {
-                    desc.block(entry, vec![Inst::literal(x, 42), Inst::jump(cond)]);
-                    desc.block(
-                        cond,
-                        vec![
-                            Inst::builtin(lt1, sir::BuiltinKind::Lt),
-                            Inst::literal(tmp2, -1),
-                            Inst::copy(tmp3, x),
-                            Inst::push_arg(tmp2),
-                            Inst::push_arg(tmp3),
-                            Inst::call(cond1, lt1),
-                            Inst::branch(cond1, body, cont),
-                        ],
-                    );
-                    desc.block(
-                        body,
-                        vec![
-                            Inst::builtin(add1, sir::BuiltinKind::Add),
-                            Inst::copy(tmp4, x),
-                            Inst::literal(tmp5, -1),
-                            Inst::push_arg(tmp4),
-                            Inst::push_arg(tmp5),
-                            Inst::call(x, add1),
-                            Inst::literal(tmp1, ()),
-                            Inst::jump(cond),
-                        ],
-                    );
-                    desc.block(cont, vec![Inst::literal(tmp1, ()), Inst::return_(tmp1)]);
+                |[x, tmp1, cond1, lt1, tmp2, tmp3, add1, tmp4, tmp5], [entry, cond, body, cont]| {
+                    vec![
+                        (entry, vec![Inst::literal(x, 42), Inst::jump(cond)]),
+                        (
+                            cond,
+                            vec![
+                                Inst::builtin(lt1, sir::BuiltinKind::Lt),
+                                Inst::literal(tmp2, -1),
+                                Inst::copy(tmp3, x),
+                                Inst::push_arg(tmp2),
+                                Inst::push_arg(tmp3),
+                                Inst::call(cond1, lt1),
+                                Inst::branch(cond1, body, cont),
+                            ],
+                        ),
+                        (
+                            body,
+                            vec![
+                                Inst::builtin(add1, sir::BuiltinKind::Add),
+                                Inst::copy(tmp4, x),
+                                Inst::literal(tmp5, -1),
+                                Inst::push_arg(tmp4),
+                                Inst::push_arg(tmp5),
+                                Inst::call(x, add1),
+                                Inst::literal(tmp1, ()),
+                                Inst::jump(cond),
+                            ],
+                        ),
+                        (cont, vec![Inst::literal(tmp1, ()), Inst::return_(tmp1)]),
+                    ]
                 }
             )
         );
@@ -476,8 +477,8 @@ mod tests {
         let function = lower(&builtin_ids, &s);
         assert_eq!(
             function,
-            sir::Function::describe(0, |desc, (_tmp1, tmp2, puti1, tmp3), (entry,)| {
-                desc.block(
+            sir::Function::describe(0, |[_tmp1, tmp2, puti1, tmp3], [entry]| {
+                vec![(
                     entry,
                     vec![
                         Inst::builtin(puti1, sir::BuiltinKind::Puti),
@@ -486,7 +487,7 @@ mod tests {
                         Inst::call(tmp2, puti1),
                         Inst::return_(tmp2),
                     ],
-                );
+                )]
             })
         );
     }

@@ -316,16 +316,15 @@ impl Type {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sir::testing::{FunctionTestingExt, ProgramUnitTestingExt};
+    use crate::sir::testing::ProgramUnitTestingExt;
     use crate::sir::{Function, Inst};
 
     #[test]
     fn test_typecheck_success() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::describe(
-            0,
-            |desc, (x, tmp1, puti1, tmp2), (entry,)| {
-                desc.block(
+        let program_unit =
+            ProgramUnit::simple(Function::describe(0, |[x, tmp1, puti1, tmp2], [entry]| {
+                vec![(
                     entry,
                     vec![
                         Inst::builtin(puti1, BuiltinKind::Puti),
@@ -335,16 +334,15 @@ mod tests {
                         Inst::literal(tmp1, ()),
                         Inst::return_(tmp1),
                     ],
-                );
-            },
-        ));
+                )]
+            }));
         assert!(typecheck(&cctx, &program_unit).is_ok());
     }
 
     #[test]
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(tmp1, puti1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |[tmp1, puti1, tmp2]| {
             vec![
                 Inst::builtin(puti1, BuiltinKind::Puti),
                 Inst::call(tmp2, puti1),
@@ -358,7 +356,7 @@ mod tests {
     #[test]
     fn test_typecheck_failure_too_many_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, puti1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |[x, tmp1, puti1, tmp2]| {
             vec![
                 Inst::literal(x, 42),
                 Inst::builtin(puti1, BuiltinKind::Puti),
@@ -375,7 +373,7 @@ mod tests {
     #[test]
     fn test_typecheck_failure_arg_type_mismatch() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, puti1, tmp2)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |[x, tmp1, puti1, tmp2]| {
             vec![
                 Inst::literal(x, "Hello, world!"),
                 Inst::builtin(puti1, BuiltinKind::Puti),
@@ -391,7 +389,7 @@ mod tests {
     #[test]
     fn test_typecheck_failure_runaway_arg() {
         let cctx = CCtx::new();
-        let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
+        let program_unit = ProgramUnit::simple(Function::simple(0, |[x, tmp1]| {
             vec![
                 Inst::literal(x, "Hello, world!"),
                 Inst::literal(tmp1, ()),

@@ -16,7 +16,7 @@ pub fn eval(ctx: &dyn RtCtx, program_unit: &ProgramUnit) {
 mod tests {
     use super::*;
 
-    use crate::sir::testing::{FunctionTestingExt, ProgramUnitTestingExt};
+    use crate::sir::testing::ProgramUnitTestingExt;
     use crate::sir::{BuiltinKind, Function, Inst};
     use crate::testing::MockRtCtx;
 
@@ -25,7 +25,7 @@ mod tests {
         let ctx = MockRtCtx::new();
         eval(
             &ctx,
-            &ProgramUnit::simple(Function::simple(0, |(x, tmp1, puts1, tmp2)| {
+            &ProgramUnit::simple(Function::simple(0, |[x, tmp1, puts1, tmp2]| {
                 vec![
                     Inst::literal(x, "Hello, world!"),
                     Inst::builtin(puts1, BuiltinKind::Puts),
@@ -46,21 +46,23 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::describe(
                 0,
-                |desc, (x, tmp1, puts1, tmp2), (entry, label1)| {
-                    desc.block(
-                        entry,
-                        vec![Inst::literal(x, "Hello, world!"), Inst::jump(label1)],
-                    );
-                    desc.block(
-                        label1,
-                        vec![
-                            Inst::builtin(puts1, BuiltinKind::Puts),
-                            Inst::push_arg(x),
-                            Inst::call(tmp2, puts1),
-                            Inst::literal(tmp1, ()),
-                            Inst::return_(tmp1),
-                        ],
-                    );
+                |[x, tmp1, puts1, tmp2], [entry, label1]| {
+                    vec![
+                        (
+                            entry,
+                            vec![Inst::literal(x, "Hello, world!"), Inst::jump(label1)],
+                        ),
+                        (
+                            label1,
+                            vec![
+                                Inst::builtin(puts1, BuiltinKind::Puts),
+                                Inst::push_arg(x),
+                                Inst::call(tmp2, puts1),
+                                Inst::literal(tmp1, ()),
+                                Inst::return_(tmp1),
+                            ],
+                        ),
+                    ]
                 },
             )),
         );
@@ -74,7 +76,7 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::simple(
                 0,
-                |(tmp1, tmp2, x, add1, tmp3, puti1, tmp4)| {
+                |[tmp1, tmp2, x, add1, tmp3, puti1, tmp4]| {
                     vec![
                         Inst::literal(tmp1, 1),
                         Inst::literal(tmp2, 1),
@@ -101,36 +103,38 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::describe(
                 0,
-                |desc, (x, s, tmp1, puts1, tmp2), (entry, branch_then, branch_else)| {
-                    desc.block(
-                        entry,
-                        vec![
-                            Inst::literal(x, true),
-                            Inst::branch(x, branch_then, branch_else),
-                        ],
-                    );
-                    desc.block(
-                        branch_then,
-                        vec![
-                            Inst::literal(s, "x is true"),
-                            Inst::builtin(puts1, BuiltinKind::Puts),
-                            Inst::push_arg(s),
-                            Inst::call(tmp2, puts1),
-                            Inst::literal(tmp1, ()),
-                            Inst::return_(tmp1),
-                        ],
-                    );
-                    desc.block(
-                        branch_else,
-                        vec![
-                            Inst::literal(s, "x is false"),
-                            Inst::builtin(puts1, BuiltinKind::Puts),
-                            Inst::push_arg(s),
-                            Inst::call(tmp2, puts1),
-                            Inst::literal(tmp1, ()),
-                            Inst::return_(tmp1),
-                        ],
-                    );
+                |[x, s, tmp1, puts1, tmp2], [entry, branch_then, branch_else]| {
+                    vec![
+                        (
+                            entry,
+                            vec![
+                                Inst::literal(x, true),
+                                Inst::branch(x, branch_then, branch_else),
+                            ],
+                        ),
+                        (
+                            branch_then,
+                            vec![
+                                Inst::literal(s, "x is true"),
+                                Inst::builtin(puts1, BuiltinKind::Puts),
+                                Inst::push_arg(s),
+                                Inst::call(tmp2, puts1),
+                                Inst::literal(tmp1, ()),
+                                Inst::return_(tmp1),
+                            ],
+                        ),
+                        (
+                            branch_else,
+                            vec![
+                                Inst::literal(s, "x is false"),
+                                Inst::builtin(puts1, BuiltinKind::Puts),
+                                Inst::push_arg(s),
+                                Inst::call(tmp2, puts1),
+                                Inst::literal(tmp1, ()),
+                                Inst::return_(tmp1),
+                            ],
+                        ),
+                    ]
                 },
             )),
         );
@@ -144,36 +148,38 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::describe(
                 0,
-                |desc, (x, s, tmp1, puts1, tmp2), (entry, branch_then, branch_else)| {
-                    desc.block(
-                        entry,
-                        vec![
-                            Inst::literal(x, false),
-                            Inst::branch(x, branch_then, branch_else),
-                        ],
-                    );
-                    desc.block(
-                        branch_then,
-                        vec![
-                            Inst::literal(s, "x is true"),
-                            Inst::builtin(puts1, BuiltinKind::Puts),
-                            Inst::push_arg(s),
-                            Inst::call(tmp2, puts1),
-                            Inst::literal(tmp1, ()),
-                            Inst::return_(tmp1),
-                        ],
-                    );
-                    desc.block(
-                        branch_else,
-                        vec![
-                            Inst::literal(s, "x is false"),
-                            Inst::builtin(puts1, BuiltinKind::Puts),
-                            Inst::push_arg(s),
-                            Inst::call(tmp2, puts1),
-                            Inst::literal(tmp1, ()),
-                            Inst::return_(tmp1),
-                        ],
-                    );
+                |[x, s, tmp1, puts1, tmp2], [entry, branch_then, branch_else]| {
+                    vec![
+                        (
+                            entry,
+                            vec![
+                                Inst::literal(x, false),
+                                Inst::branch(x, branch_then, branch_else),
+                            ],
+                        ),
+                        (
+                            branch_then,
+                            vec![
+                                Inst::literal(s, "x is true"),
+                                Inst::builtin(puts1, BuiltinKind::Puts),
+                                Inst::push_arg(s),
+                                Inst::call(tmp2, puts1),
+                                Inst::literal(tmp1, ()),
+                                Inst::return_(tmp1),
+                            ],
+                        ),
+                        (
+                            branch_else,
+                            vec![
+                                Inst::literal(s, "x is false"),
+                                Inst::builtin(puts1, BuiltinKind::Puts),
+                                Inst::push_arg(s),
+                                Inst::call(tmp2, puts1),
+                                Inst::literal(tmp1, ()),
+                                Inst::return_(tmp1),
+                            ],
+                        ),
+                    ]
                 },
             )),
         );
@@ -195,64 +201,65 @@ mod tests {
             &ctx,
             &ProgramUnit::simple(Function::describe(
                 0,
-                |desc,
-                 (sum, i, tmp1, lt1, add1, puti1, tmp2, tmp3, tmp4, tmp5),
-                 (entry, cond, body, end)| {
-                    desc.block(
-                        entry,
-                        vec![
-                            // let mut sum = 0;
-                            Inst::literal(sum, 0),
-                            // let mut i = 0;
-                            Inst::literal(i, 0),
-                            // goto cond;
-                            Inst::jump(1),
-                        ],
-                    );
-                    desc.block(
-                        cond,
-                        vec![
-                            // tmp1 = 10;
-                            Inst::literal(tmp1, 10),
-                            // tmp2 = i < tmp1;
-                            Inst::builtin(lt1, BuiltinKind::Lt),
-                            Inst::push_arg(i),
-                            Inst::push_arg(tmp1),
-                            Inst::call(tmp2, lt1),
-                            // if tmp2 { goto body; } else { goto end; };
-                            Inst::branch(tmp2, body, end),
-                        ],
-                    );
-                    desc.block(
-                        body,
-                        vec![
-                            // sum = sum + i;
-                            Inst::builtin(add1, BuiltinKind::Add),
-                            Inst::push_arg(sum),
-                            Inst::push_arg(i),
-                            Inst::call(sum, add1),
-                            // i = i + 1;
-                            Inst::literal(tmp3, 1),
-                            Inst::builtin(add1, BuiltinKind::Add),
-                            Inst::push_arg(i),
-                            Inst::push_arg(tmp3),
-                            Inst::call(i, add1),
-                            // goto cond;
-                            Inst::jump(cond),
-                        ],
-                    );
-                    desc.block(
-                        end,
-                        vec![
-                            // puti(sum);
-                            Inst::builtin(puti1, BuiltinKind::Puti),
-                            Inst::push_arg(sum),
-                            Inst::call(tmp5, puti1),
-                            // return;
-                            Inst::literal(tmp4, ()),
-                            Inst::return_(tmp4),
-                        ],
-                    );
+                |[sum, i, tmp1, lt1, add1, puti1, tmp2, tmp3, tmp4, tmp5],
+                 [entry, cond, body, end]| {
+                    vec![
+                        (
+                            entry,
+                            vec![
+                                // let mut sum = 0;
+                                Inst::literal(sum, 0),
+                                // let mut i = 0;
+                                Inst::literal(i, 0),
+                                // goto cond;
+                                Inst::jump(1),
+                            ],
+                        ),
+                        (
+                            cond,
+                            vec![
+                                // tmp1 = 10;
+                                Inst::literal(tmp1, 10),
+                                // tmp2 = i < tmp1;
+                                Inst::builtin(lt1, BuiltinKind::Lt),
+                                Inst::push_arg(i),
+                                Inst::push_arg(tmp1),
+                                Inst::call(tmp2, lt1),
+                                // if tmp2 { goto body; } else { goto end; };
+                                Inst::branch(tmp2, body, end),
+                            ],
+                        ),
+                        (
+                            body,
+                            vec![
+                                // sum = sum + i;
+                                Inst::builtin(add1, BuiltinKind::Add),
+                                Inst::push_arg(sum),
+                                Inst::push_arg(i),
+                                Inst::call(sum, add1),
+                                // i = i + 1;
+                                Inst::literal(tmp3, 1),
+                                Inst::builtin(add1, BuiltinKind::Add),
+                                Inst::push_arg(i),
+                                Inst::push_arg(tmp3),
+                                Inst::call(i, add1),
+                                // goto cond;
+                                Inst::jump(cond),
+                            ],
+                        ),
+                        (
+                            end,
+                            vec![
+                                // puti(sum);
+                                Inst::builtin(puti1, BuiltinKind::Puti),
+                                Inst::push_arg(sum),
+                                Inst::call(tmp5, puti1),
+                                // return;
+                                Inst::literal(tmp4, ()),
+                                Inst::return_(tmp4),
+                            ],
+                        ),
+                    ]
                 },
             )),
         );
@@ -276,7 +283,7 @@ mod tests {
             &ProgramUnit::describe(|p, (entry, fib)| {
                 p.function(
                     entry,
-                    Function::simple(0, |(tmp1, fib1, tmp2, tmp3, puti1, tmp4)| {
+                    Function::simple(0, |[tmp1, fib1, tmp2, tmp3, puti1, tmp4]| {
                         vec![
                             // tmp1 = 10;
                             Inst::literal(tmp1, 10),
@@ -298,75 +305,62 @@ mod tests {
                     fib,
                     Function::describe(
                         1,
-                        |desc,
-                         (
-                            n,
-                            tmp1,
-                            lt1,
-                            tmp2,
-                            tmp3,
-                            tmp4,
-                            add1,
-                            tmp5,
-                            fib1,
-                            tmp6,
-                            tmp7,
-                            tmp8,
-                            tmp9,
-                        ),
-                         (entry, branch_then, branch_else)| {
-                            desc.block(
-                                entry,
-                                vec![
-                                    // tmp1 = n < 2;
-                                    Inst::literal(tmp2, 2),
-                                    Inst::builtin(lt1, BuiltinKind::Lt),
-                                    Inst::push_arg(n),
-                                    Inst::push_arg(tmp2),
-                                    Inst::call(tmp1, lt1),
-                                    // if tmp1 { goto branch_then; } else { goto branch_else; };
-                                    Inst::branch(tmp1, branch_then, branch_else),
-                                ],
-                            );
-                            desc.block(
-                                branch_then,
-                                vec![
-                                    // return n;
-                                    Inst::return_(n),
-                                ],
-                            );
-                            desc.block(
-                                branch_else,
-                                vec![
-                                    // tmp4 = n - 1;
-                                    Inst::literal(tmp5, -1),
-                                    Inst::builtin(add1, BuiltinKind::Add),
-                                    Inst::push_arg(n),
-                                    Inst::push_arg(tmp5),
-                                    Inst::call(tmp4, add1),
-                                    // tmp6 = fib(tmp4);
-                                    Inst::closure(fib1, fib),
-                                    Inst::push_arg(tmp4),
-                                    Inst::call(tmp6, fib1),
-                                    // tmp7 = n - 2;
-                                    Inst::literal(tmp8, -2),
-                                    Inst::builtin(add1, BuiltinKind::Add),
-                                    Inst::push_arg(n),
-                                    Inst::push_arg(tmp8),
-                                    Inst::call(tmp7, add1),
-                                    // tmp9 = fib(tmp7);
-                                    Inst::closure(fib1, fib),
-                                    Inst::push_arg(tmp7),
-                                    Inst::call(tmp9, fib1),
-                                    // tmp3 = tmp6 + tmp9;
-                                    Inst::builtin(add1, BuiltinKind::Add),
-                                    Inst::push_arg(tmp6),
-                                    Inst::push_arg(tmp9),
-                                    Inst::call(tmp3, add1),
-                                    // return tmp3;
-                                    Inst::return_(tmp3),
-                                ],
-                            );
+                        |[n, tmp1, lt1, tmp2, tmp3, tmp4, add1, tmp5, fib1, tmp6, tmp7, tmp8, tmp9],
+                         [entry, branch_then, branch_else]| {
+                            vec![
+                                (
+                                    entry,
+                                    vec![
+                                        // tmp1 = n < 2;
+                                        Inst::literal(tmp2, 2),
+                                        Inst::builtin(lt1, BuiltinKind::Lt),
+                                        Inst::push_arg(n),
+                                        Inst::push_arg(tmp2),
+                                        Inst::call(tmp1, lt1),
+                                        // if tmp1 { goto branch_then; } else { goto branch_else; };
+                                        Inst::branch(tmp1, branch_then, branch_else),
+                                    ],
+                                ),
+                                (
+                                    branch_then,
+                                    vec![
+                                        // return n;
+                                        Inst::return_(n),
+                                    ],
+                                ),
+                                (
+                                    branch_else,
+                                    vec![
+                                        // tmp4 = n - 1;
+                                        Inst::literal(tmp5, -1),
+                                        Inst::builtin(add1, BuiltinKind::Add),
+                                        Inst::push_arg(n),
+                                        Inst::push_arg(tmp5),
+                                        Inst::call(tmp4, add1),
+                                        // tmp6 = fib(tmp4);
+                                        Inst::closure(fib1, fib),
+                                        Inst::push_arg(tmp4),
+                                        Inst::call(tmp6, fib1),
+                                        // tmp7 = n - 2;
+                                        Inst::literal(tmp8, -2),
+                                        Inst::builtin(add1, BuiltinKind::Add),
+                                        Inst::push_arg(n),
+                                        Inst::push_arg(tmp8),
+                                        Inst::call(tmp7, add1),
+                                        // tmp9 = fib(tmp7);
+                                        Inst::closure(fib1, fib),
+                                        Inst::push_arg(tmp7),
+                                        Inst::call(tmp9, fib1),
+                                        // tmp3 = tmp6 + tmp9;
+                                        Inst::builtin(add1, BuiltinKind::Add),
+                                        Inst::push_arg(tmp6),
+                                        Inst::push_arg(tmp9),
+                                        Inst::call(tmp3, add1),
+                                        // return tmp3;
+                                        Inst::return_(tmp3),
+                                    ],
+                                ),
+                            ]
                         },
                     ),
                 );

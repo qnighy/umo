@@ -15,6 +15,7 @@ mod sir_compile;
 mod sir_eval;
 mod sir_typecheck;
 pub mod testing;
+mod util;
 
 pub fn run(ctx: &dyn rt_ctx::RtCtx, source_path: &Path) {
     let source = fs::read_to_string(source_path).unwrap();
