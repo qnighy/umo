@@ -316,8 +316,8 @@ impl Type {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sir::testing::{insts, FunctionTestingExt, ProgramUnitTestingExt};
-    use crate::sir::Function;
+    use crate::sir::testing::{FunctionTestingExt, ProgramUnitTestingExt};
+    use crate::sir::{Function, Inst};
 
     #[test]
     fn test_typecheck_success() {
@@ -328,12 +328,12 @@ mod tests {
                 desc.block(
                     entry,
                     vec![
-                        insts::builtin(puti1, BuiltinKind::Puti),
-                        insts::integer_literal(x, 42),
-                        insts::push_arg(x),
-                        insts::call(tmp2, puti1),
-                        insts::unit_literal(tmp1),
-                        insts::return_(tmp1),
+                        Inst::builtin(puti1, BuiltinKind::Puti),
+                        Inst::literal(x, 42),
+                        Inst::push_arg(x),
+                        Inst::call(tmp2, puti1),
+                        Inst::literal(tmp1, ()),
+                        Inst::return_(tmp1),
                     ],
                 );
             },
@@ -346,10 +346,10 @@ mod tests {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |(tmp1, puti1, tmp2)| {
             vec![
-                insts::builtin(puti1, BuiltinKind::Puti),
-                insts::call(tmp2, puti1),
-                insts::unit_literal(tmp1),
-                insts::return_(tmp1),
+                Inst::builtin(puti1, BuiltinKind::Puti),
+                Inst::call(tmp2, puti1),
+                Inst::literal(tmp1, ()),
+                Inst::return_(tmp1),
             ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
@@ -360,13 +360,13 @@ mod tests {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, puti1, tmp2)| {
             vec![
-                insts::integer_literal(x, 42),
-                insts::builtin(puti1, BuiltinKind::Puti),
-                insts::push_arg(x),
-                insts::push_arg(x),
-                insts::call(tmp2, puti1),
-                insts::unit_literal(tmp1),
-                insts::return_(tmp1),
+                Inst::literal(x, 42),
+                Inst::builtin(puti1, BuiltinKind::Puti),
+                Inst::push_arg(x),
+                Inst::push_arg(x),
+                Inst::call(tmp2, puti1),
+                Inst::literal(tmp1, ()),
+                Inst::return_(tmp1),
             ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
@@ -377,12 +377,12 @@ mod tests {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1, puti1, tmp2)| {
             vec![
-                insts::string_literal(x, "Hello, world!"),
-                insts::builtin(puti1, BuiltinKind::Puti),
-                insts::push_arg(x),
-                insts::call(tmp2, puti1),
-                insts::unit_literal(tmp1),
-                insts::return_(tmp1),
+                Inst::literal(x, "Hello, world!"),
+                Inst::builtin(puti1, BuiltinKind::Puti),
+                Inst::push_arg(x),
+                Inst::call(tmp2, puti1),
+                Inst::literal(tmp1, ()),
+                Inst::return_(tmp1),
             ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
@@ -393,10 +393,10 @@ mod tests {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |(x, tmp1)| {
             vec![
-                insts::string_literal(x, "Hello, world!"),
-                insts::unit_literal(tmp1),
-                insts::push_arg(x),
-                insts::return_(tmp1),
+                Inst::literal(x, "Hello, world!"),
+                Inst::literal(tmp1, ()),
+                Inst::push_arg(x),
+                Inst::return_(tmp1),
             ]
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());

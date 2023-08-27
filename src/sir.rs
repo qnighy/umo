@@ -1,5 +1,6 @@
 // SIR -- Sequential Intermediate Representation
 
+use std::fmt;
 use std::sync::Arc;
 
 use crate::cctx::Id;
@@ -53,7 +54,7 @@ impl BasicBlock {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Inst {
     pub id: Id,
     pub kind: InstKind,
@@ -65,6 +66,97 @@ impl Inst {
             id: Id::default(),
             kind,
         }
+    }
+    pub fn with_id(self, id: Id) -> Self {
+        Self { id, ..self }
+    }
+
+    pub fn jump(target: usize) -> Self {
+        Self::new(InstKind::Jump { target })
+    }
+    pub fn branch(cond: usize, branch_then: usize, branch_else: usize) -> Self {
+        Self::new(InstKind::Branch {
+            cond,
+            branch_then,
+            branch_else,
+        })
+    }
+    pub fn return_(rhs: usize) -> Self {
+        Self::new(InstKind::Return { rhs })
+    }
+    pub fn copy(lhs: usize, rhs: usize) -> Self {
+        Self::new(InstKind::Copy { lhs, rhs })
+    }
+    pub fn drop(rhs: usize) -> Self {
+        Self::new(InstKind::Drop { rhs })
+    }
+    pub fn literal<L: Into<Literal>>(lhs: usize, value: L) -> Self {
+        Self::new(InstKind::Literal {
+            lhs,
+            value: value.into(),
+        })
+    }
+    pub fn closure(lhs: usize, function_id: usize) -> Self {
+        Self::new(InstKind::Closure { lhs, function_id })
+    }
+    pub fn builtin(lhs: usize, builtin: BuiltinKind) -> Self {
+        Self::new(InstKind::Builtin { lhs, builtin })
+    }
+    pub fn push_arg(value_ref: usize) -> Self {
+        Self::new(InstKind::PushArg { value_ref })
+    }
+    pub fn call(lhs: usize, callee: usize) -> Self {
+        Self::new(InstKind::Call { lhs, callee })
+    }
+}
+
+impl fmt::Debug for Inst {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            InstKind::Jump { target } => f.debug_tuple("Inst::jump").field(target).finish()?,
+            InstKind::Branch {
+                cond,
+                branch_then,
+                branch_else,
+            } => f
+                .debug_tuple("Inst::branch")
+                .field(cond)
+                .field(branch_then)
+                .field(branch_else)
+                .finish()?,
+            InstKind::Return { rhs } => f.debug_tuple("Inst::return_").field(rhs).finish()?,
+            InstKind::Copy { lhs, rhs } => {
+                f.debug_tuple("Inst::copy").field(lhs).field(rhs).finish()?
+            }
+            InstKind::Drop { rhs } => f.debug_tuple("Inst::drop").field(rhs).finish()?,
+            InstKind::Literal { lhs, value } => f
+                .debug_tuple("Inst::literal")
+                .field(lhs)
+                .field(&value.debug_inner())
+                .finish()?,
+            InstKind::Closure { lhs, function_id } => f
+                .debug_tuple("Inst::closure")
+                .field(lhs)
+                .field(function_id)
+                .finish()?,
+            InstKind::Builtin { lhs, builtin } => f
+                .debug_tuple("Inst::builtin")
+                .field(lhs)
+                .field(builtin)
+                .finish()?,
+            InstKind::PushArg { value_ref } => {
+                f.debug_tuple("Inst::push_arg").field(value_ref).finish()?
+            }
+            InstKind::Call { lhs, callee } => f
+                .debug_tuple("Inst::call")
+                .field(lhs)
+                .field(callee)
+                .finish()?,
+        }
+        if !self.id.is_dummy() {
+            f.debug_tuple(".with_id").field(&self.id).finish()?;
+        }
+        Ok(())
     }
 }
 
@@ -127,13 +219,63 @@ impl InstKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Literal {
     Unit,
     // TODO: use BigInt
     Integer(i32),
     Bool(bool),
     String(Arc<String>),
+}
+
+impl From<()> for Literal {
+    fn from(_: ()) -> Self {
+        Self::Unit
+    }
+}
+impl From<i32> for Literal {
+    fn from(i: i32) -> Self {
+        Self::Integer(i)
+    }
+}
+impl From<bool> for Literal {
+    fn from(b: bool) -> Self {
+        Self::Bool(b)
+    }
+}
+impl From<&str> for Literal {
+    fn from(s: &str) -> Self {
+        Self::String(Arc::new(s.to_owned()))
+    }
+}
+
+impl Literal {
+    fn debug_inner(&self) -> impl fmt::Debug + '_ {
+        struct D<'a>(&'a Literal);
+        return D(self);
+
+        impl fmt::Debug for D<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self.0 {
+                    Literal::Unit => write!(f, "()"),
+                    Literal::Integer(i) => write!(f, "{:?}", i),
+                    Literal::Bool(b) => write!(f, "{:?}", b),
+                    Literal::String(s) => write!(f, "{:?}", s),
+                }
+            }
+        }
+    }
+}
+
+impl fmt::Debug for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Literal::Unit => write!(f, "Literal::from(())"),
+            Literal::Integer(i) => write!(f, "Literal::from({:?})", i),
+            Literal::Bool(b) => write!(f, "Literal::from({:?})", b),
+            Literal::String(s) => write!(f, "Literal::from({:?})", s),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -248,66 +390,6 @@ pub mod testing {
         pub fn block(&mut self, bb_id: usize, insts: Vec<Inst>) -> &mut Self {
             self.function.body[bb_id] = BasicBlock::new(insts);
             self
-        }
-    }
-
-    pub mod insts {
-        use crate::sir::{BuiltinKind, Inst, InstKind, Literal};
-        use std::sync::Arc;
-        pub fn jump(target: usize) -> Inst {
-            Inst::new(InstKind::Jump { target })
-        }
-        pub fn branch(cond: usize, branch_then: usize, branch_else: usize) -> Inst {
-            Inst::new(InstKind::Branch {
-                cond,
-                branch_then,
-                branch_else,
-            })
-        }
-        pub fn return_(rhs: usize) -> Inst {
-            Inst::new(InstKind::Return { rhs })
-        }
-        pub fn copy(lhs: usize, rhs: usize) -> Inst {
-            Inst::new(InstKind::Copy { lhs, rhs })
-        }
-        pub fn drop(rhs: usize) -> Inst {
-            Inst::new(InstKind::Drop { rhs })
-        }
-        pub fn unit_literal(lhs: usize) -> Inst {
-            Inst::new(InstKind::Literal {
-                lhs,
-                value: Literal::Unit,
-            })
-        }
-        pub fn integer_literal(lhs: usize, value: i32) -> Inst {
-            Inst::new(InstKind::Literal {
-                lhs,
-                value: Literal::Integer(value),
-            })
-        }
-        pub fn bool_literal(lhs: usize, value: bool) -> Inst {
-            Inst::new(InstKind::Literal {
-                lhs,
-                value: Literal::Bool(value),
-            })
-        }
-        pub fn string_literal(lhs: usize, value: &str) -> Inst {
-            Inst::new(InstKind::Literal {
-                lhs,
-                value: Literal::String(Arc::new(value.to_owned())),
-            })
-        }
-        pub fn closure(lhs: usize, function_id: usize) -> Inst {
-            Inst::new(InstKind::Closure { lhs, function_id })
-        }
-        pub fn builtin(lhs: usize, builtin: BuiltinKind) -> Inst {
-            Inst::new(InstKind::Builtin { lhs, builtin })
-        }
-        pub fn push_arg(value_ref: usize) -> Inst {
-            Inst::new(InstKind::PushArg { value_ref })
-        }
-        pub fn call(lhs: usize, callee: usize) -> Inst {
-            Inst::new(InstKind::Call { lhs, callee })
         }
     }
 }

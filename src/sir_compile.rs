@@ -188,23 +188,20 @@ fn insert_copy_bb(
         // Drop arguments if it is unused
         for arg_id in 0..num_args {
             if !live_in.get(&old_insts[0].id).unwrap().contains(arg_id) {
-                bb.insts.push(Inst::new(InstKind::Drop { rhs: arg_id }));
+                bb.insts.push(Inst::drop(arg_id));
             }
         }
     }
     for mut inst in old_insts {
         if let Some(copied_var) = copied_var_for.get(&inst.id) {
-            bb.insts.push(Inst::new(InstKind::Copy {
-                lhs: *copied_var,
-                rhs: moved_rhs_of(&inst).unwrap(),
-            }));
+            bb.insts
+                .push(Inst::copy(*copied_var, moved_rhs_of(&inst).unwrap()));
             replace_moved_rhs(&mut inst, *copied_var);
         }
         let id = inst.id;
         bb.insts.push(inst);
         if let Some(dropped_var) = dropped_var_for.get(&id) {
-            bb.insts
-                .push(Inst::new(InstKind::Drop { rhs: *dropped_var }));
+            bb.insts.push(Inst::drop(*dropped_var));
         }
     }
 }
@@ -279,10 +276,8 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::sir::{
-        testing::{insts, FunctionTestingExt, ProgramUnitTestingExt},
-        BuiltinKind,
-    };
+    use crate::sir::testing::{FunctionTestingExt, ProgramUnitTestingExt};
+    use crate::sir::{BuiltinKind, Inst};
 
     use super::*;
 
@@ -291,19 +286,19 @@ mod tests {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
             vec![
-                insts::string_literal(x, "Hello, world!"),
-                insts::builtin(puts1, BuiltinKind::Puts),
-                insts::push_arg(x),
-                insts::call(tmp2, puts1),
-                insts::builtin(puts1, BuiltinKind::Puts),
-                insts::push_arg(x),
-                insts::call(tmp2, puts1),
-                insts::string_literal(x, "Hello, world!"),
-                insts::builtin(puts1, BuiltinKind::Puts),
-                insts::push_arg(x),
-                insts::call(tmp2, puts1),
-                insts::unit_literal(tmp1),
-                insts::return_(tmp1),
+                Inst::literal(x, "Hello, world!"),
+                Inst::builtin(puts1, BuiltinKind::Puts),
+                Inst::push_arg(x),
+                Inst::call(tmp2, puts1),
+                Inst::builtin(puts1, BuiltinKind::Puts),
+                Inst::push_arg(x),
+                Inst::call(tmp2, puts1),
+                Inst::literal(x, "Hello, world!"),
+                Inst::builtin(puts1, BuiltinKind::Puts),
+                Inst::push_arg(x),
+                Inst::call(tmp2, puts1),
+                Inst::literal(tmp1, ()),
+                Inst::return_(tmp1),
             ]
         }));
         let program_unit = compile(&cctx, &program_unit);
@@ -311,23 +306,23 @@ mod tests {
             program_unit,
             ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2, tmp3)| {
                 vec![
-                    insts::string_literal(x, "Hello, world!"),
-                    insts::builtin(puts1, BuiltinKind::Puts),
-                    insts::copy(tmp3, x),
-                    insts::push_arg(tmp3),
-                    insts::call(tmp2, puts1),
-                    insts::drop(tmp2),
-                    insts::builtin(puts1, BuiltinKind::Puts),
-                    insts::push_arg(x),
-                    insts::call(tmp2, puts1),
-                    insts::drop(tmp2),
-                    insts::string_literal(x, "Hello, world!"),
-                    insts::builtin(puts1, BuiltinKind::Puts),
-                    insts::push_arg(x),
-                    insts::call(tmp2, puts1),
-                    insts::drop(tmp2),
-                    insts::unit_literal(tmp1),
-                    insts::return_(tmp1),
+                    Inst::literal(x, "Hello, world!"),
+                    Inst::builtin(puts1, BuiltinKind::Puts),
+                    Inst::copy(tmp3, x),
+                    Inst::push_arg(tmp3),
+                    Inst::call(tmp2, puts1),
+                    Inst::drop(tmp2),
+                    Inst::builtin(puts1, BuiltinKind::Puts),
+                    Inst::push_arg(x),
+                    Inst::call(tmp2, puts1),
+                    Inst::drop(tmp2),
+                    Inst::literal(x, "Hello, world!"),
+                    Inst::builtin(puts1, BuiltinKind::Puts),
+                    Inst::push_arg(x),
+                    Inst::call(tmp2, puts1),
+                    Inst::drop(tmp2),
+                    Inst::literal(tmp1, ()),
+                    Inst::return_(tmp1),
                 ]
             }))
         );
@@ -338,13 +333,13 @@ mod tests {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
             vec![
-                insts::string_literal(x, "dummy"),
-                insts::string_literal(x, "Hello, world!"),
-                insts::builtin(puts1, BuiltinKind::Puts),
-                insts::push_arg(x),
-                insts::call(tmp2, puts1),
-                insts::unit_literal(tmp1),
-                insts::return_(tmp1),
+                Inst::literal(x, "dummy"),
+                Inst::literal(x, "Hello, world!"),
+                Inst::builtin(puts1, BuiltinKind::Puts),
+                Inst::push_arg(x),
+                Inst::call(tmp2, puts1),
+                Inst::literal(tmp1, ()),
+                Inst::return_(tmp1),
             ]
         }));
         let program_unit = compile(&cctx, &program_unit);
@@ -352,15 +347,15 @@ mod tests {
             program_unit,
             ProgramUnit::simple(Function::simple(0, |(x, puts1, tmp1, tmp2)| {
                 vec![
-                    insts::string_literal(x, "dummy"),
-                    insts::drop(x),
-                    insts::string_literal(x, "Hello, world!"),
-                    insts::builtin(puts1, BuiltinKind::Puts),
-                    insts::push_arg(x),
-                    insts::call(tmp2, puts1),
-                    insts::drop(tmp2),
-                    insts::unit_literal(tmp1),
-                    insts::return_(tmp1),
+                    Inst::literal(x, "dummy"),
+                    Inst::drop(x),
+                    Inst::literal(x, "Hello, world!"),
+                    Inst::builtin(puts1, BuiltinKind::Puts),
+                    Inst::push_arg(x),
+                    Inst::call(tmp2, puts1),
+                    Inst::drop(tmp2),
+                    Inst::literal(tmp1, ()),
+                    Inst::return_(tmp1),
                 ]
             }))
         );
@@ -370,16 +365,16 @@ mod tests {
     fn test_compile_drop_arg() {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(1, |(_arg1, tmp1)| {
-            vec![insts::unit_literal(tmp1), insts::return_(tmp1)]
+            vec![Inst::literal(tmp1, ()), Inst::return_(tmp1)]
         }));
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
             ProgramUnit::simple(Function::simple(1, |(arg, tmp1)| {
                 vec![
-                    insts::drop(arg),
-                    insts::unit_literal(tmp1),
-                    insts::return_(tmp1),
+                    Inst::drop(arg),
+                    Inst::literal(tmp1, ()),
+                    Inst::return_(tmp1),
                 ]
             }))
         );

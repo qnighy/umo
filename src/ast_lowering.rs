@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 use crate::ast::{BinOp, BuiltinIds, BuiltinKind, Expr, Stmt};
 use crate::cctx::Id;
@@ -30,7 +29,7 @@ pub fn lower(builtin_ids: &BuiltinIds, stmts: &[Stmt]) -> sir::Function {
     };
     let result_var = fctx.fresh_var();
     lower_stmts(&mut fctx, stmts, result_var);
-    fctx.push(sir::Inst::new(sir::InstKind::Return { rhs: result_var }));
+    fctx.push(sir::Inst::return_(result_var));
     function
 }
 
@@ -79,10 +78,7 @@ fn lower_stmt(fctx: &mut FunctionContext<'_>, stmt: &Stmt, result_var: Option<us
             let var_id = fctx.var_id_map[&lhs.id];
             lower_expr(fctx, init, var_id);
             if let Some(result_var) = result_var {
-                fctx.push(sir::Inst::new(sir::InstKind::Literal {
-                    lhs: result_var,
-                    value: sir::Literal::Unit,
-                }))
+                fctx.push(sir::Inst::literal(result_var, ()));
             }
         }
         Stmt::Expr { expr, use_value } => {
@@ -96,10 +92,7 @@ fn lower_stmt(fctx: &mut FunctionContext<'_>, stmt: &Stmt, result_var: Option<us
             lower_expr(fctx, expr, stmt_result_var);
             if result_var.is_some() && !*use_value {
                 // Return unit instead
-                fctx.push(sir::Inst::new(sir::InstKind::Literal {
-                    lhs: result_var.unwrap(),
-                    value: sir::Literal::Unit,
-                }))
+                fctx.push(sir::Inst::literal(result_var.unwrap(), ()));
             }
         }
     }
@@ -110,19 +103,16 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
         Expr::Var { ident } => {
             let builtin = fctx.builtin_ids.builtins.get(&ident.id).copied();
             if let Some(builtin) = builtin {
-                fctx.push(sir::Inst::new(sir::InstKind::Builtin {
-                    lhs: result_var,
-                    builtin: match builtin {
+                fctx.push(sir::Inst::builtin(
+                    result_var,
+                    match builtin {
                         BuiltinKind::Puts => sir::BuiltinKind::Puts,
                         BuiltinKind::Puti => sir::BuiltinKind::Puti,
                     },
-                }));
+                ));
             } else {
                 let var_id = fctx.var_id_map[&ident.id];
-                fctx.push(sir::Inst::new(sir::InstKind::Copy {
-                    lhs: result_var,
-                    rhs: var_id,
-                }));
+                fctx.push(sir::Inst::copy(result_var, var_id));
             }
         }
         Expr::Branch { cond, then, else_ } => {
@@ -140,20 +130,10 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
 
             fctx.push_at(
                 branch_bb_id,
-                sir::Inst::new(sir::InstKind::Branch {
-                    cond: cond_var,
-                    branch_then: then_bb_id,
-                    branch_else: else_bb_id,
-                }),
+                sir::Inst::branch(cond_var, then_bb_id, else_bb_id),
             );
-            fctx.push_at(
-                then_bb_id,
-                sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }),
-            );
-            fctx.push_at(
-                else_bb_id,
-                sir::Inst::new(sir::InstKind::Jump { target: cont_bb_id }),
-            );
+            fctx.push_at(then_bb_id, sir::Inst::jump(cont_bb_id));
+            fctx.push_at(else_bb_id, sir::Inst::jump(cont_bb_id));
         }
         Expr::While { cond, body } => {
             let prev_bb_id = fctx.current_bb_id();
@@ -166,36 +146,20 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
 
             let cont_bb_id = fctx.new_bb();
 
-            fctx.push_at(
-                prev_bb_id,
-                sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }),
-            );
+            fctx.push_at(prev_bb_id, sir::Inst::jump(cond_bb_id));
             fctx.push_at(
                 cond_bb_id,
-                sir::Inst::new(sir::InstKind::Branch {
-                    cond: cond_var,
-                    branch_then: body_bb_id,
-                    branch_else: cont_bb_id,
-                }),
+                sir::Inst::branch(cond_var, body_bb_id, cont_bb_id),
             );
-            fctx.push_at(
-                body_bb_id,
-                sir::Inst::new(sir::InstKind::Jump { target: cond_bb_id }),
-            );
-            fctx.push(sir::Inst::new(sir::InstKind::Literal {
-                lhs: result_var,
-                value: sir::Literal::Unit,
-            }));
+            fctx.push_at(body_bb_id, sir::Inst::jump(cond_bb_id));
+            fctx.push(sir::Inst::literal(result_var, ()));
         }
         Expr::Block { stmts } => lower_stmts(fctx, stmts, result_var),
         Expr::Assign { lhs, rhs } => {
             debug_assert!(!lhs.id.is_dummy());
             let var_id = fctx.var_id_map[&lhs.id];
             lower_expr(fctx, rhs, var_id);
-            fctx.push(sir::Inst::new(sir::InstKind::Literal {
-                lhs: result_var,
-                value: sir::Literal::Unit,
-            }));
+            fctx.push(sir::Inst::literal(result_var, ()));
         }
         Expr::Call { callee, args } => {
             let callee_var = lower_expr2(fctx, callee);
@@ -204,50 +168,32 @@ fn lower_expr(fctx: &mut FunctionContext<'_>, expr: &Expr, result_var: usize) {
                 .map(|arg| lower_expr2(fctx, arg))
                 .collect::<Vec<_>>();
             for &arg_var in &arg_vars {
-                fctx.push(sir::Inst::new(sir::InstKind::PushArg {
-                    value_ref: arg_var,
-                }));
+                fctx.push(sir::Inst::push_arg(arg_var));
             }
-            fctx.push(sir::Inst::new(sir::InstKind::Call {
-                lhs: result_var,
-                callee: callee_var,
-            }));
+            fctx.push(sir::Inst::call(result_var, callee_var));
         }
         Expr::IntegerLiteral { value } => {
-            fctx.push(sir::Inst::new(sir::InstKind::Literal {
-                lhs: result_var,
-                value: sir::Literal::Integer(*value),
-            }));
+            fctx.push(sir::Inst::literal(result_var, *value));
         }
         Expr::StringLiteral { value } => {
-            fctx.push(sir::Inst::new(sir::InstKind::Literal {
-                lhs: result_var,
-                value: sir::Literal::String(Arc::new(value.clone())),
-            }));
+            fctx.push(sir::Inst::literal(result_var, &**value));
         }
         Expr::BinOp { op, lhs, rhs } => {
             let callee_var = fctx.fresh_var();
-            fctx.push(sir::Inst::new(sir::InstKind::Builtin {
-                lhs: callee_var,
-                builtin: match op {
+            fctx.push(sir::Inst::builtin(
+                callee_var,
+                match op {
                     BinOp::Add => sir::BuiltinKind::Add,
                     BinOp::Lt => sir::BuiltinKind::Lt,
                 },
-            }));
+            ));
 
             let lhs_var = lower_expr2(fctx, lhs);
             let rhs_var = lower_expr2(fctx, rhs);
 
-            fctx.push(sir::Inst::new(sir::InstKind::PushArg {
-                value_ref: lhs_var,
-            }));
-            fctx.push(sir::Inst::new(sir::InstKind::PushArg {
-                value_ref: rhs_var,
-            }));
-            fctx.push(sir::Inst::new(sir::InstKind::Call {
-                lhs: result_var,
-                callee: callee_var,
-            }));
+            fctx.push(sir::Inst::push_arg(lhs_var));
+            fctx.push(sir::Inst::push_arg(rhs_var));
+            fctx.push(sir::Inst::call(result_var, callee_var));
         }
     }
 }
@@ -319,7 +265,8 @@ mod tests {
     use crate::ast::testing::{exprs, stmts};
     use crate::ast::{assign_id_stmts, Scope};
     use crate::cctx::CCtx;
-    use crate::sir::testing::{insts, FunctionTestingExt};
+    use crate::sir::testing::FunctionTestingExt;
+    use crate::sir::Inst;
 
     fn assign_id(cctx: &mut CCtx, builtin_ids: &BuiltinIds, mut stmts: Vec<Stmt>) -> Vec<Stmt> {
         let mut scope = Scope::new(builtin_ids);
@@ -346,12 +293,12 @@ mod tests {
                 desc.block(
                     entry,
                     vec![
-                        insts::builtin(puts1, sir::BuiltinKind::Puts),
-                        insts::string_literal(tmp4, "Hello, world!"),
-                        insts::push_arg(tmp4),
-                        insts::call(tmp3, puts1),
-                        insts::unit_literal(tmp2),
-                        insts::return_(tmp2),
+                        Inst::builtin(puts1, sir::BuiltinKind::Puts),
+                        Inst::literal(tmp4, "Hello, world!"),
+                        Inst::push_arg(tmp4),
+                        Inst::call(tmp3, puts1),
+                        Inst::literal(tmp2, ()),
+                        Inst::return_(tmp2),
                     ],
                 );
             })
@@ -377,13 +324,13 @@ mod tests {
                 desc.block(
                     entry,
                     vec![
-                        insts::builtin(add1, sir::BuiltinKind::Add),
-                        insts::integer_literal(tmp2, 1),
-                        insts::integer_literal(tmp3, 2),
-                        insts::push_arg(tmp2),
-                        insts::push_arg(tmp3),
-                        insts::call(tmp1, add1),
-                        insts::return_(tmp1),
+                        Inst::builtin(add1, sir::BuiltinKind::Add),
+                        Inst::literal(tmp2, 1),
+                        Inst::literal(tmp3, 2),
+                        Inst::push_arg(tmp2),
+                        Inst::push_arg(tmp3),
+                        Inst::call(tmp1, add1),
+                        Inst::return_(tmp1),
                     ],
                 );
             })
@@ -409,9 +356,9 @@ mod tests {
                 desc.block(
                     entry,
                     vec![
-                        insts::integer_literal(x, 42),
-                        insts::copy(tmp1, x),
-                        insts::return_(tmp1),
+                        Inst::literal(x, 42),
+                        Inst::copy(tmp1, x),
+                        Inst::return_(tmp1),
                     ],
                 );
             })
@@ -443,20 +390,14 @@ mod tests {
                     desc.block(
                         entry,
                         vec![
-                            insts::integer_literal(x, 42),
-                            insts::copy(tmp2, x),
-                            insts::branch(tmp2, branch_then, branch_else),
+                            Inst::literal(x, 42),
+                            Inst::copy(tmp2, x),
+                            Inst::branch(tmp2, branch_then, branch_else),
                         ],
                     );
-                    desc.block(
-                        branch_then,
-                        vec![insts::integer_literal(tmp1, 1), insts::jump(cont)],
-                    );
-                    desc.block(
-                        branch_else,
-                        vec![insts::integer_literal(tmp1, 2), insts::jump(cont)],
-                    );
-                    desc.block(cont, vec![insts::return_(tmp1)]);
+                    desc.block(branch_then, vec![Inst::literal(tmp1, 1), Inst::jump(cont)]);
+                    desc.block(branch_else, vec![Inst::literal(tmp1, 2), Inst::jump(cont)]);
+                    desc.block(cont, vec![Inst::return_(tmp1)]);
                 }
             )
         );
@@ -488,36 +429,33 @@ mod tests {
                 |desc,
                  (x, tmp1, cond1, lt1, tmp2, tmp3, add1, tmp4, tmp5),
                  (entry, cond, body, cont)| {
-                    desc.block(
-                        entry,
-                        vec![insts::integer_literal(x, 42), insts::jump(cond)],
-                    );
+                    desc.block(entry, vec![Inst::literal(x, 42), Inst::jump(cond)]);
                     desc.block(
                         cond,
                         vec![
-                            insts::builtin(lt1, sir::BuiltinKind::Lt),
-                            insts::integer_literal(tmp2, -1),
-                            insts::copy(tmp3, x),
-                            insts::push_arg(tmp2),
-                            insts::push_arg(tmp3),
-                            insts::call(cond1, lt1),
-                            insts::branch(cond1, body, cont),
+                            Inst::builtin(lt1, sir::BuiltinKind::Lt),
+                            Inst::literal(tmp2, -1),
+                            Inst::copy(tmp3, x),
+                            Inst::push_arg(tmp2),
+                            Inst::push_arg(tmp3),
+                            Inst::call(cond1, lt1),
+                            Inst::branch(cond1, body, cont),
                         ],
                     );
                     desc.block(
                         body,
                         vec![
-                            insts::builtin(add1, sir::BuiltinKind::Add),
-                            insts::copy(tmp4, x),
-                            insts::integer_literal(tmp5, -1),
-                            insts::push_arg(tmp4),
-                            insts::push_arg(tmp5),
-                            insts::call(x, add1),
-                            insts::unit_literal(tmp1),
-                            insts::jump(cond),
+                            Inst::builtin(add1, sir::BuiltinKind::Add),
+                            Inst::copy(tmp4, x),
+                            Inst::literal(tmp5, -1),
+                            Inst::push_arg(tmp4),
+                            Inst::push_arg(tmp5),
+                            Inst::call(x, add1),
+                            Inst::literal(tmp1, ()),
+                            Inst::jump(cond),
                         ],
                     );
-                    desc.block(cont, vec![insts::unit_literal(tmp1), insts::return_(tmp1)]);
+                    desc.block(cont, vec![Inst::literal(tmp1, ()), Inst::return_(tmp1)]);
                 }
             )
         );
@@ -542,11 +480,11 @@ mod tests {
                 desc.block(
                     entry,
                     vec![
-                        insts::builtin(puti1, sir::BuiltinKind::Puti),
-                        insts::integer_literal(tmp3, 42),
-                        insts::push_arg(tmp3),
-                        insts::call(tmp2, puti1),
-                        insts::return_(tmp2),
+                        Inst::builtin(puti1, sir::BuiltinKind::Puti),
+                        Inst::literal(tmp3, 42),
+                        Inst::push_arg(tmp3),
+                        Inst::call(tmp2, puti1),
+                        Inst::return_(tmp2),
                     ],
                 );
             })
