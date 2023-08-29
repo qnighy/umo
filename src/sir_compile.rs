@@ -276,8 +276,7 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::sir::testing::ProgramUnitTestingExt;
-    use crate::sir::{BuiltinKind, Inst};
+    use crate::sir::{BuiltinKind, Inst, ProgramUnit};
 
     use super::*;
 

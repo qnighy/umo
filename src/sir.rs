@@ -15,6 +15,34 @@ impl ProgramUnit {
     pub fn new(functions: Vec<Function>) -> Self {
         Self { functions }
     }
+
+    pub fn describe<const NF: usize, F>(f: F) -> Self
+    where
+        F: FnOnce([usize; NF]) -> Vec<(usize, Function)>,
+    {
+        let functions_indexed = f(SeqInit::seq());
+        for (i, &(function_id, _)) in functions_indexed.iter().enumerate() {
+            assert_eq!(
+                function_id,
+                i,
+                "The {}th function_id should be {}, got {}",
+                i + 1,
+                i,
+                function_id
+            );
+        }
+        let functions = functions_indexed
+            .into_iter()
+            .map(|(_, function)| function)
+            .collect::<Vec<_>>();
+        Self::new(functions)
+    }
+
+    pub fn simple(function: Function) -> Self {
+        Self {
+            functions: vec![function],
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -315,60 +343,4 @@ pub enum BuiltinKind {
     Lt,
     Puts,
     Puti,
-}
-
-#[cfg(test)]
-pub mod testing {
-    use crate::sir::{BasicBlock, Function, Inst, ProgramUnit};
-    use crate::testing::SeqGen;
-
-    pub trait ProgramUnitTestingExt {
-        fn describe<FS, F>(f: F) -> Self
-        where
-            FS: SeqGen,
-            F: FnOnce(&mut ProgramUnitDescriber, FS);
-
-        fn simple(function: Function) -> Self;
-    }
-
-    impl ProgramUnitTestingExt for ProgramUnit {
-        fn describe<FS, F>(f: F) -> Self
-        where
-            FS: SeqGen,
-            F: FnOnce(&mut ProgramUnitDescriber, FS),
-        {
-            let mut desc = ProgramUnitDescriber {
-                program_unit: ProgramUnit {
-                    functions: vec![
-                        Function {
-                            num_args: 0,
-                            num_vars: 0,
-                            body: vec![]
-                        };
-                        FS::size()
-                    ],
-                },
-            };
-            f(&mut desc, FS::seq());
-            desc.program_unit
-        }
-
-        fn simple(function: Function) -> Self {
-            Self {
-                functions: vec![function],
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    pub struct ProgramUnitDescriber {
-        program_unit: ProgramUnit,
-    }
-
-    impl ProgramUnitDescriber {
-        pub fn function(&mut self, function_id: usize, function: Function) -> &mut Self {
-            self.program_unit.functions[function_id] = function;
-            self
-        }
-    }
 }

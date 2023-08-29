@@ -316,8 +316,7 @@ impl Type {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sir::testing::ProgramUnitTestingExt;
-    use crate::sir::{Function, Inst};
+    use crate::sir::{Function, Inst, ProgramUnit};
 
     #[test]
     fn test_typecheck_success() {
