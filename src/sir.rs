@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::cctx::Id;
 use crate::util::SeqInit;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ProgramUnit {
     pub functions: Vec<Function>,
 }
@@ -45,7 +45,40 @@ impl ProgramUnit {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+impl fmt::Debug for ProgramUnit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.functions.len() == 1 {
+            f.debug_tuple("ProgramUnit::simple")
+                .field(&self.functions[0])
+                .finish()
+        } else {
+            struct ClosureWrapper<'a>(&'a ProgramUnit);
+            impl fmt::Debug for ClosureWrapper<'_> {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    let functions = (0..self.0.functions.len())
+                        .map(|i| format!("f{}", i))
+                        .collect::<Vec<_>>();
+
+                    f.write_str("|")?;
+                    f.debug_list()
+                        .entries(functions.iter().map(|f| IdentPrinter(f)))
+                        .finish()?;
+                    f.write_str("| ")?;
+                    f.debug_list()
+                        .entries(self.0.functions.iter().enumerate())
+                        .finish()?;
+                    Ok(())
+                }
+            }
+
+            f.debug_tuple("ProgramUnit::describe")
+                .field(&ClosureWrapper(self))
+                .finish()
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Function {
     /// Number of arguments, Must be <= num_vars
     pub num_args: usize,
@@ -88,6 +121,93 @@ impl Function {
         F: FnOnce([usize; NV]) -> Vec<Inst>,
     {
         Self::new(num_args, NV, vec![BasicBlock::new(f(SeqInit::seq()))])
+    }
+
+    fn fmt_debug_with(&self, f: &mut fmt::Formatter<'_>, functions: &[String]) -> fmt::Result {
+        if self.body.len() == 1 {
+            struct SimpleClosureWrapper<'a>(&'a Function, &'a [String]);
+            impl fmt::Debug for SimpleClosureWrapper<'_> {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    let functions = self.1;
+                    let vars = (0..self.0.num_vars)
+                        .map(|i| format!("v{}", i))
+                        .collect::<Vec<_>>();
+                    f.write_str("|")?;
+                    f.debug_list()
+                        .entries(vars.iter().map(|v| IdentPrinter(v)))
+                        .finish()?;
+                    f.write_str("| ")?;
+                    f.debug_list()
+                        .entries(
+                            &self.0.body[0]
+                                .insts
+                                .iter()
+                                .map(|inst| inst.debug_with(&vars, &[], functions))
+                                .collect::<Vec<_>>(),
+                        )
+                        .finish()?;
+                    Ok(())
+                }
+            }
+
+            f.debug_tuple("Function::simple")
+                .field(&self.num_args)
+                .field(&SimpleClosureWrapper(self, functions))
+                .finish()
+        } else {
+            struct ClosureWrapper<'a>(&'a Function, &'a [String]);
+            impl fmt::Debug for ClosureWrapper<'_> {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    let functions = self.1;
+                    let vars = (0..self.0.num_vars)
+                        .map(|i| format!("v{}", i))
+                        .collect::<Vec<_>>();
+                    let blocks = (0..self.0.body.len())
+                        .map(|i| format!("bb{}", i))
+                        .collect::<Vec<_>>();
+
+                    f.write_str("|")?;
+                    f.debug_list()
+                        .entries(vars.iter().map(|v| IdentPrinter(v)))
+                        .finish()?;
+                    f.write_str(", ")?;
+                    f.debug_list()
+                        .entries(blocks.iter().map(|v| IdentPrinter(v)))
+                        .finish()?;
+                    f.write_str("| ")?;
+                    f.debug_list()
+                        .entries(self.0.body.iter().enumerate().map(|(i, bb)| {
+                            (
+                                i,
+                                bb.insts
+                                    .iter()
+                                    .map(|inst| inst.debug_with(&vars, &blocks, functions))
+                                    .collect::<Vec<_>>(),
+                            )
+                        }))
+                        .finish()?;
+                    Ok(())
+                }
+            }
+
+            f.debug_tuple("Function::describe")
+                .field(&self.num_args)
+                .field(&ClosureWrapper(self, functions))
+                .finish()
+        }
+    }
+}
+
+impl fmt::Debug for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_debug_with(f, &[])
+    }
+}
+
+struct IdentPrinter<'a>(&'a str);
+impl fmt::Debug for IdentPrinter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0)
     }
 }
 
@@ -167,55 +287,126 @@ impl Inst {
     pub fn call(lhs: usize, callee: usize) -> Self {
         Self::new(InstKind::Call { lhs, callee })
     }
-}
 
-impl fmt::Debug for Inst {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn debug_with<'a>(
+        &'a self,
+        vars: &'a [String],
+        blocks: &'a [String],
+        functions: &'a [String],
+    ) -> impl fmt::Debug + 'a {
+        struct D<'a>(&'a Inst, &'a [String], &'a [String], &'a [String]);
+        return D(self, vars, blocks, functions);
+
+        impl fmt::Debug for D<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                self.0.fmt_debug_with(f, self.1, self.2, self.3)
+            }
+        }
+    }
+
+    fn fmt_debug_with(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        vars: &[String],
+        blocks: &[String],
+        functions: &[String],
+    ) -> fmt::Result {
         match &self.kind {
-            InstKind::Jump { target } => f.debug_tuple("Inst::jump").field(target).finish()?,
+            InstKind::Jump { target } => f
+                .debug_tuple("Inst::jump")
+                .field(&BlockDebugWrapper(*target, blocks))
+                .finish()?,
             InstKind::Branch {
                 cond,
                 branch_then,
                 branch_else,
             } => f
                 .debug_tuple("Inst::branch")
-                .field(cond)
-                .field(branch_then)
-                .field(branch_else)
+                .field(&VarDebugWrapper(*cond, vars))
+                .field(&BlockDebugWrapper(*branch_then, blocks))
+                .field(&BlockDebugWrapper(*branch_else, blocks))
                 .finish()?,
-            InstKind::Return { rhs } => f.debug_tuple("Inst::return_").field(rhs).finish()?,
-            InstKind::Copy { lhs, rhs } => {
-                f.debug_tuple("Inst::copy").field(lhs).field(rhs).finish()?
-            }
-            InstKind::Drop { rhs } => f.debug_tuple("Inst::drop").field(rhs).finish()?,
+            InstKind::Return { rhs } => f
+                .debug_tuple("Inst::return_")
+                .field(&VarDebugWrapper(*rhs, vars))
+                .finish()?,
+            InstKind::Copy { lhs, rhs } => f
+                .debug_tuple("Inst::copy")
+                .field(&VarDebugWrapper(*lhs, vars))
+                .field(&VarDebugWrapper(*rhs, vars))
+                .finish()?,
+            InstKind::Drop { rhs } => f
+                .debug_tuple("Inst::drop")
+                .field(&VarDebugWrapper(*rhs, vars))
+                .finish()?,
             InstKind::Literal { lhs, value } => f
                 .debug_tuple("Inst::literal")
-                .field(lhs)
+                .field(&VarDebugWrapper(*lhs, vars))
                 .field(&value.debug_inner())
                 .finish()?,
             InstKind::Closure { lhs, function_id } => f
                 .debug_tuple("Inst::closure")
-                .field(lhs)
-                .field(function_id)
+                .field(&VarDebugWrapper(*lhs, vars))
+                .field(&FunctionDebugWrapper(*function_id, functions))
                 .finish()?,
             InstKind::Builtin { lhs, builtin } => f
                 .debug_tuple("Inst::builtin")
-                .field(lhs)
+                .field(&VarDebugWrapper(*lhs, vars))
                 .field(builtin)
                 .finish()?,
-            InstKind::PushArg { value_ref } => {
-                f.debug_tuple("Inst::push_arg").field(value_ref).finish()?
-            }
+            InstKind::PushArg { value_ref } => f
+                .debug_tuple("Inst::push_arg")
+                .field(&VarDebugWrapper(*value_ref, vars))
+                .finish()?,
             InstKind::Call { lhs, callee } => f
                 .debug_tuple("Inst::call")
-                .field(lhs)
-                .field(callee)
+                .field(&VarDebugWrapper(*lhs, vars))
+                .field(&VarDebugWrapper(*callee, vars))
                 .finish()?,
         }
         if !self.id.is_dummy() {
             f.debug_tuple(".with_id").field(&self.id).finish()?;
         }
         Ok(())
+    }
+}
+
+impl fmt::Debug for Inst {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_debug_with(f, &[], &[], &[])
+    }
+}
+
+struct VarDebugWrapper<'a>(usize, &'a [String]);
+impl fmt::Debug for VarDebugWrapper<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(var_name) = self.1.get(self.0) {
+            write!(f, "{}", var_name)
+        } else {
+            write!(f, "{}", self.0)
+        }
+    }
+}
+
+struct BlockDebugWrapper<'a>(usize, &'a [String]);
+impl fmt::Debug for BlockDebugWrapper<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(block_name) = self.1.get(self.0) {
+            write!(f, "{}", block_name)
+        } else {
+            write!(f, "{}", self.0)
+        }
+    }
+}
+
+struct FunctionDebugWrapper<'a>(usize, &'a [String]);
+impl fmt::Debug for FunctionDebugWrapper<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(function_name) = self.1.get(self.0) {
+            write!(f, "{}", function_name)
+        } else {
+            write!(f, "{}", self.0)
+        }
     }
 }
 
