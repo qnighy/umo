@@ -261,6 +261,8 @@ fn collect_vars_expr(expr: &Expr, vars: &mut HashSet<Id>) {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
     use crate::ast::testing::{exprs, stmts};
     use crate::ast::{assign_id_stmts, Scope};

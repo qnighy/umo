@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 bit-set = "0.5.3"
 clap = { version = "4.3.19", features = ["derive"] }
+
+[dev-dependencies]
+pretty_assertions = "1.4.0"

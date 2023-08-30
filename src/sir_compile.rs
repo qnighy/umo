@@ -276,6 +276,8 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use crate::sir::{BuiltinKind, Inst, ProgramUnit};
 
     use super::*;
