@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::mem;
 
 use bit_set::BitSet;
 
-use crate::cctx::{CCtx, Id};
+use crate::cctx::CCtx;
 use crate::sir::{BasicBlock, Function, Inst, InstKind, ProgramUnit};
 
 pub fn compile(cctx: &CCtx, program_unit: &ProgramUnit) -> ProgramUnit {
@@ -16,194 +15,214 @@ pub fn compile(cctx: &CCtx, program_unit: &ProgramUnit) -> ProgramUnit {
 
 fn compile_function(cctx: &CCtx, function: &Function) -> Function {
     let mut function = function.clone();
-    assign_id(cctx, &mut function);
-    let live_in = liveness(cctx, &function);
-    insert_copy(cctx, &mut function, &live_in);
-    unassign_id(&mut function);
+    liveness(cctx, &mut function);
+    insert_copy(cctx, &mut function);
     function
 }
 
-fn assign_id(cctx: &CCtx, function: &mut Function) {
-    for bb in &mut function.body {
-        assign_id_bb(cctx, bb);
-    }
-}
-fn assign_id_bb(cctx: &CCtx, bb: &mut BasicBlock) {
-    for inst in &mut bb.insts {
-        inst.id = cctx.id_gen.fresh();
-    }
-}
-
-fn unassign_id(function: &mut Function) {
-    for bb in &mut function.body {
-        unassign_id_bb(bb);
-    }
-}
-fn unassign_id_bb(bb: &mut BasicBlock) {
-    for inst in &mut bb.insts {
-        inst.id = Id::default();
-    }
-}
-
-fn liveness(cctx: &CCtx, function: &Function) -> HashMap<Id, BitSet<usize>> {
-    let mut live_in = HashMap::new();
+fn liveness(cctx: &CCtx, function: &mut Function) {
     let mut updated = true;
     while updated {
         updated = false;
-        for bb in function.body.iter().rev() {
-            liveness_bb(cctx, function, bb, &mut live_in, &mut updated);
+        for bb_id in 0..function.body.len() {
+            liveness_bb(cctx, function, bb_id, &mut updated);
         }
     }
-    live_in
 }
-fn liveness_bb(
-    _cctx: &CCtx,
-    function: &Function,
-    bb: &BasicBlock,
-    live_in: &mut HashMap<Id, BitSet<usize>>,
-    updated: &mut bool,
-) {
-    let mut i = bb.insts.len();
-    let mut alive = BitSet::<usize>::default();
-    while i > 0 {
-        i -= 1;
-        match &bb.insts[i].kind {
-            InstKind::Jump { target } => {
-                alive = get_block_liveness(function, live_in, target);
-            }
-            InstKind::Branch {
-                cond,
-                branch_then,
-                branch_else,
-            } => {
-                alive = get_block_liveness(function, live_in, branch_then);
-                alive.union_with(&get_block_liveness(function, live_in, branch_else));
-                alive.insert(*cond);
-            }
-            InstKind::Return { rhs } => {
-                alive = BitSet::default();
-                alive.insert(*rhs);
-            }
-            InstKind::Copy { lhs, rhs } => {
-                alive.remove(*lhs);
-                alive.insert(*rhs);
-            }
-            InstKind::Drop { rhs } => {
-                alive.insert(*rhs);
-            }
-            InstKind::Literal { lhs, .. } => {
-                alive.remove(*lhs);
-            }
-            InstKind::Closure { lhs, function_id } => {
-                alive.remove(*lhs);
-                alive.insert(*function_id);
-            }
-            InstKind::Builtin { lhs, builtin: _ } => {
-                alive.remove(*lhs);
-            }
-            InstKind::PushArg { value_ref } => {
-                alive.insert(*value_ref);
-            }
-            InstKind::Call { lhs, callee } => {
-                alive.remove(*lhs);
-                alive.insert(*callee);
+fn liveness_bb(_cctx: &CCtx, function: &mut Function, bb_id: usize, updated: &mut bool) {
+    let mut alive = block_live_out_to_be(function, &function.body[bb_id]);
+    let bb = &mut function.body[bb_id];
+    for inst in bb.insts.iter_mut().rev() {
+        if let Some(live_out) = &inst.live_out {
+            if live_out == &alive {
+                return;
             }
         }
-        *updated = *updated
-            || if let Some(old_alive) = live_in.get(&bb.insts[i].id) {
-                *old_alive != alive
-            } else {
-                true
-            };
-        live_in.insert(bb.insts[i].id, alive.clone());
+        inst.live_out = Some(alive.clone());
+        update_alive(inst, &mut alive);
+    }
+    if let Some(live_in) = &mut bb.live_in {
+        if live_in == &alive {
+            return;
+        }
+    }
+    bb.live_in = Some(alive.clone());
+    *updated = true;
+}
+
+fn inst_live_in(inst: &Inst) -> BitSet<usize> {
+    let mut alive = inst.live_out.clone().unwrap();
+    update_alive(inst, &mut alive);
+    alive
+}
+
+fn update_alive(inst: &Inst, alive: &mut BitSet<usize>) {
+    match &inst.kind {
+        InstKind::Jump { target: _ } => {}
+        InstKind::Branch {
+            cond,
+            branch_then: _,
+            branch_else: _,
+        } => {
+            alive.insert(*cond);
+        }
+        InstKind::Return { rhs } => {
+            alive.insert(*rhs);
+        }
+        InstKind::Copy { lhs, rhs } => {
+            alive.remove(*lhs);
+            alive.insert(*rhs);
+        }
+        InstKind::Drop { rhs } => {
+            alive.insert(*rhs);
+        }
+        InstKind::Literal { lhs, .. } => {
+            alive.remove(*lhs);
+        }
+        InstKind::Closure { lhs, function_id } => {
+            alive.remove(*lhs);
+            alive.insert(*function_id);
+        }
+        InstKind::Builtin { lhs, builtin: _ } => {
+            alive.remove(*lhs);
+        }
+        InstKind::PushArg { value_ref } => {
+            alive.insert(*value_ref);
+        }
+        InstKind::Call { lhs, callee } => {
+            alive.remove(*lhs);
+            alive.insert(*callee);
+        }
     }
 }
 
-fn get_block_liveness(
-    function: &Function,
-    live_in: &HashMap<Id, BitSet<usize>>,
-    target: &usize,
-) -> BitSet<usize> {
-    live_in
-        .get(&function.body[*target].insts[0].id)
-        .cloned()
-        .unwrap_or_else(|| BitSet::default())
+/// Computes live-out from the successor blocks.
+/// (may yield different result from `block_live_out` during the liveness analysis)
+fn block_live_out_to_be(function: &Function, bb: &BasicBlock) -> BitSet<usize> {
+    let last = bb.insts.last().unwrap();
+    assert!(last.kind.is_tail());
+    match &last.kind {
+        InstKind::Jump { target } => function.body[*target].live_in.clone().unwrap_or_default(),
+        InstKind::Branch {
+            cond: _,
+            branch_then,
+            branch_else,
+        } => {
+            let mut live_out = function.body[*branch_then]
+                .live_in
+                .clone()
+                .unwrap_or_default();
+            if let Some(live_in_else) = &function.body[*branch_else].live_in {
+                live_out.union_with(&live_in_else);
+            }
+            live_out
+        }
+        InstKind::Return { rhs: _ } => BitSet::default(),
+        _ => unreachable!(),
+    }
+}
+
+fn block_live_out(bb: &BasicBlock) -> &BitSet<usize> {
+    bb.insts.last().unwrap().live_out.as_ref().unwrap()
 }
 
 // Also inserts Drop when necessary
-fn insert_copy(cctx: &CCtx, function: &mut Function, live_in: &HashMap<Id, BitSet<usize>>) {
-    for (i, bb) in function.body.iter_mut().enumerate() {
-        let num_args = if i == 0 {
-            Some(function.num_args)
+fn insert_copy(cctx: &CCtx, function: &mut Function) {
+    // Compute carried over variables
+    let mut carried_over = vec![BitSet::<usize>::default(); function.body.len()];
+    for arg in 0..function.num_args {
+        carried_over[0].insert(arg);
+    }
+    // Its correctness depends on the absense of multi-in multi-out edges.
+    // That means, all the block connections falls into the following cases:
+    // 1. An edge that shares its successor with other edges, but not its predecessor. (i.e. Jump)
+    // 2. An edge that shares its predecessor with other edges, but not its successor. (i.e. Branch)
+    // 3. An edge that does not share its predecessor nor successor with other edges (but its probably useless)
+    for bb in function.body.iter() {
+        let last = bb.insts.last().unwrap();
+        assert!(last.kind.is_tail());
+        match &bb.insts.last().unwrap().kind {
+            InstKind::Jump { target } => {
+                // *target may have multiple writes, but the value is same across predecessors.
+                // Therefore it is safe to say that the value is the intersection of the predecessors rather than union.
+                carried_over[*target].union_with(block_live_out(bb));
+            }
+            InstKind::Branch {
+                cond: _,
+                branch_then,
+                branch_else,
+            } => {
+                // *branch_then is written only once.
+                // Therefore it is safe to say that the value is the intersection of the predecessors rather than union.
+                // The same applies to *branch_else.
+                carried_over[*branch_then].union_with(block_live_out(bb));
+                carried_over[*branch_else].union_with(block_live_out(bb));
+            }
+            InstKind::Return { rhs: _ } => {}
+            _ => unreachable!(),
+        }
+    }
+
+    for (bb, bb_co) in function.body.iter_mut().zip(carried_over) {
+        insert_copy_bb(cctx, &mut function.num_vars, bb, bb_co);
+    }
+}
+
+fn insert_copy_bb(
+    _cctx: &CCtx,
+    num_vars: &mut usize,
+    bb: &mut BasicBlock,
+    mut carried_over: BitSet<usize>,
+) {
+    let old_insts = mem::replace(&mut bb.insts, Vec::new());
+
+    // Drop unused variables carried over from the last block (caused by branch instructions)
+    let mut unused_carried_over = carried_over.clone();
+    unused_carried_over.difference_with(bb.live_in.as_ref().unwrap());
+    for var in unused_carried_over.iter() {
+        carried_over.remove(var);
+        bb.insts
+            .push(Inst::drop(var).with_live_out(carried_over.clone()));
+    }
+
+    // Process block body
+    for mut inst in old_insts {
+        // Insert copy before the instruction, if necessary
+        if let Some(moved_rhs) = moved_rhs_of(&inst) {
+            if inst.live_out.as_ref().unwrap().contains(moved_rhs) {
+                let new_rhs = fresh_var(num_vars);
+                let mut alive = inst_live_in(&inst);
+                alive.insert(new_rhs);
+                bb.insts
+                    .push(Inst::copy(new_rhs, moved_rhs).with_live_out(alive));
+                replace_moved_rhs(&mut inst, new_rhs);
+            }
+        }
+
+        // Insert drop after the instruction, if necessary
+        let drop_inst = if let Some(lhs) = lhs_of(&inst) {
+            if !inst.live_out.as_ref().unwrap().contains(lhs) {
+                let drop_live_out = inst.live_out.clone().unwrap();
+                inst.live_out.as_mut().unwrap().insert(lhs);
+                Some(Inst::drop(lhs).with_live_out(drop_live_out))
+            } else {
+                None
+            }
         } else {
             None
         };
-        insert_copy_bb(cctx, num_args, &mut function.num_vars, bb, live_in);
+
+        bb.insts.push(inst);
+        if let Some(drop_inst) = drop_inst {
+            bb.insts.push(drop_inst);
+        }
     }
 }
-fn insert_copy_bb(
-    _cctx: &CCtx,
-    num_args: Option<usize>,
-    num_vars: &mut usize,
-    bb: &mut BasicBlock,
-    live_in: &HashMap<Id, BitSet<usize>>,
-) {
-    let mut copied_var_for = HashMap::new();
-    let mut dropped_var_for = HashMap::new();
-    for (i, inst) in bb.insts.iter().enumerate() {
-        let rhs = moved_rhs_of(inst);
-        if let Some(rhs) = rhs {
-            let used_next = if i + 1 < bb.insts.len() {
-                if let Some(live_in) = live_in.get(&bb.insts[i + 1].id) {
-                    live_in.contains(rhs)
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-            if used_next {
-                copied_var_for.insert(inst.id, *num_vars);
-                *num_vars += 1;
-            }
-        }
-        let lhs = lhs_of(inst);
-        if let Some(lhs) = lhs {
-            let used_next = if i + 1 < bb.insts.len() {
-                if let Some(live_in) = live_in.get(&bb.insts[i + 1].id) {
-                    live_in.contains(lhs)
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-            if !used_next {
-                dropped_var_for.insert(inst.id, lhs);
-            }
-        }
-    }
-    let old_insts = mem::replace(&mut bb.insts, vec![]);
-    if let Some(num_args) = num_args {
-        // Drop arguments if it is unused
-        for arg_id in 0..num_args {
-            if !live_in.get(&old_insts[0].id).unwrap().contains(arg_id) {
-                bb.insts.push(Inst::drop(arg_id));
-            }
-        }
-    }
-    for mut inst in old_insts {
-        if let Some(copied_var) = copied_var_for.get(&inst.id) {
-            bb.insts
-                .push(Inst::copy(*copied_var, moved_rhs_of(&inst).unwrap()));
-            replace_moved_rhs(&mut inst, *copied_var);
-        }
-        let id = inst.id;
-        bb.insts.push(inst);
-        if let Some(dropped_var) = dropped_var_for.get(&id) {
-            bb.insts.push(Inst::drop(*dropped_var));
-        }
-    }
+
+fn fresh_var(num_vars: &mut usize) -> usize {
+    let var = *num_vars;
+    *num_vars += 1;
+    var
 }
 
 fn moved_rhs_of(inst: &Inst) -> Option<usize> {
@@ -278,7 +297,7 @@ fn lhs_of(inst: &Inst) -> Option<usize> {
 mod tests {
     use pretty_assertions::assert_eq;
 
-    use crate::sir::{BuiltinKind, Inst, ProgramUnit};
+    use crate::sir::{BasicBlock, BuiltinKind, Inst, ProgramUnit};
 
     use super::*;
 
@@ -286,7 +305,7 @@ mod tests {
     fn test_compile() {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |[x, puts1, tmp1, tmp2]| {
-            vec![
+            BasicBlock::new(vec![
                 Inst::literal(x, "Hello, world!"),
                 Inst::builtin(puts1, BuiltinKind::Puts),
                 Inst::push_arg(x),
@@ -300,31 +319,35 @@ mod tests {
                 Inst::call(tmp2, puts1),
                 Inst::literal(tmp1, ()),
                 Inst::return_(tmp1),
-            ]
+            ])
         }));
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
             ProgramUnit::simple(Function::simple(0, |[x, puts1, tmp1, tmp2, tmp3]| {
-                vec![
-                    Inst::literal(x, "Hello, world!"),
-                    Inst::builtin(puts1, BuiltinKind::Puts),
-                    Inst::copy(tmp3, x),
-                    Inst::push_arg(tmp3),
-                    Inst::call(tmp2, puts1),
-                    Inst::drop(tmp2),
-                    Inst::builtin(puts1, BuiltinKind::Puts),
-                    Inst::push_arg(x),
-                    Inst::call(tmp2, puts1),
-                    Inst::drop(tmp2),
-                    Inst::literal(x, "Hello, world!"),
-                    Inst::builtin(puts1, BuiltinKind::Puts),
-                    Inst::push_arg(x),
-                    Inst::call(tmp2, puts1),
-                    Inst::drop(tmp2),
-                    Inst::literal(tmp1, ()),
-                    Inst::return_(tmp1),
-                ]
+                BasicBlock::new(vec![
+                    Inst::literal(x, "Hello, world!").with_live_out([x].into_iter().collect()),
+                    Inst::builtin(puts1, BuiltinKind::Puts)
+                        .with_live_out([x, puts1].into_iter().collect()),
+                    Inst::copy(tmp3, x).with_live_out([x, puts1, tmp3].into_iter().collect()),
+                    Inst::push_arg(tmp3).with_live_out([x, puts1].into_iter().collect()),
+                    Inst::call(tmp2, puts1).with_live_out([x, tmp2].into_iter().collect()),
+                    Inst::drop(tmp2).with_live_out([x].into_iter().collect()),
+                    Inst::builtin(puts1, BuiltinKind::Puts)
+                        .with_live_out([x, puts1].into_iter().collect()),
+                    Inst::push_arg(x).with_live_out([puts1].into_iter().collect()),
+                    Inst::call(tmp2, puts1).with_live_out([tmp2].into_iter().collect()),
+                    Inst::drop(tmp2).with_live_out([].into_iter().collect()),
+                    Inst::literal(x, "Hello, world!").with_live_out([x].into_iter().collect()),
+                    Inst::builtin(puts1, BuiltinKind::Puts)
+                        .with_live_out([x, puts1].into_iter().collect()),
+                    Inst::push_arg(x).with_live_out([puts1].into_iter().collect()),
+                    Inst::call(tmp2, puts1).with_live_out([tmp2].into_iter().collect()),
+                    Inst::drop(tmp2).with_live_out([].into_iter().collect()),
+                    Inst::literal(tmp1, ()).with_live_out([tmp1].into_iter().collect()),
+                    Inst::return_(tmp1).with_live_out([].into_iter().collect()),
+                ])
+                .with_live_in([].into_iter().collect())
             }))
         );
     }
@@ -333,7 +356,7 @@ mod tests {
     fn test_compile_drop() {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |[x, puts1, tmp1, tmp2]| {
-            vec![
+            BasicBlock::new(vec![
                 Inst::literal(x, "dummy"),
                 Inst::literal(x, "Hello, world!"),
                 Inst::builtin(puts1, BuiltinKind::Puts),
@@ -341,23 +364,25 @@ mod tests {
                 Inst::call(tmp2, puts1),
                 Inst::literal(tmp1, ()),
                 Inst::return_(tmp1),
-            ]
+            ])
         }));
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
             ProgramUnit::simple(Function::simple(0, |[x, puts1, tmp1, tmp2]| {
-                vec![
-                    Inst::literal(x, "dummy"),
-                    Inst::drop(x),
-                    Inst::literal(x, "Hello, world!"),
-                    Inst::builtin(puts1, BuiltinKind::Puts),
-                    Inst::push_arg(x),
-                    Inst::call(tmp2, puts1),
-                    Inst::drop(tmp2),
-                    Inst::literal(tmp1, ()),
-                    Inst::return_(tmp1),
-                ]
+                BasicBlock::new(vec![
+                    Inst::literal(x, "dummy").with_live_out([x].into_iter().collect()),
+                    Inst::drop(x).with_live_out([].into_iter().collect()),
+                    Inst::literal(x, "Hello, world!").with_live_out([x].into_iter().collect()),
+                    Inst::builtin(puts1, BuiltinKind::Puts)
+                        .with_live_out([x, puts1].into_iter().collect()),
+                    Inst::push_arg(x).with_live_out([puts1].into_iter().collect()),
+                    Inst::call(tmp2, puts1).with_live_out([tmp2].into_iter().collect()),
+                    Inst::drop(tmp2).with_live_out([].into_iter().collect()),
+                    Inst::literal(tmp1, ()).with_live_out([tmp1].into_iter().collect()),
+                    Inst::return_(tmp1).with_live_out([].into_iter().collect()),
+                ])
+                .with_live_in([].into_iter().collect())
             }))
         );
     }
@@ -366,17 +391,18 @@ mod tests {
     fn test_compile_drop_arg() {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(1, |[_arg1, tmp1]| {
-            vec![Inst::literal(tmp1, ()), Inst::return_(tmp1)]
+            BasicBlock::new(vec![Inst::literal(tmp1, ()), Inst::return_(tmp1)])
         }));
         let program_unit = compile(&cctx, &program_unit);
         assert_eq!(
             program_unit,
             ProgramUnit::simple(Function::simple(1, |[arg, tmp1]| {
-                vec![
-                    Inst::drop(arg),
-                    Inst::literal(tmp1, ()),
-                    Inst::return_(tmp1),
-                ]
+                BasicBlock::new(vec![
+                    Inst::drop(arg).with_live_out([].into_iter().collect()),
+                    Inst::literal(tmp1, ()).with_live_out([tmp1].into_iter().collect()),
+                    Inst::return_(tmp1).with_live_out([].into_iter().collect()),
+                ])
+                .with_live_in([].into_iter().collect())
             }))
         );
     }

@@ -16,7 +16,7 @@ pub fn eval(ctx: &dyn RtCtx, program_unit: &ProgramUnit) {
 mod tests {
     use super::*;
 
-    use crate::sir::{BuiltinKind, Function, Inst, ProgramUnit};
+    use crate::sir::{BasicBlock, BuiltinKind, Function, Inst, ProgramUnit};
     use crate::testing::MockRtCtx;
 
     #[test]
@@ -25,14 +25,14 @@ mod tests {
         eval(
             &ctx,
             &ProgramUnit::simple(Function::simple(0, |[x, tmp1, puts1, tmp2]| {
-                vec![
+                BasicBlock::new(vec![
                     Inst::literal(x, "Hello, world!"),
                     Inst::builtin(puts1, BuiltinKind::Puts),
                     Inst::push_arg(x),
                     Inst::call(tmp2, puts1),
                     Inst::literal(tmp1, ()),
                     Inst::return_(tmp1),
-                ]
+                ])
             })),
         );
         assert_eq!(ctx.stdout.lock().unwrap().as_str(), "Hello, world!\n");
@@ -49,17 +49,20 @@ mod tests {
                     vec![
                         (
                             entry,
-                            vec![Inst::literal(x, "Hello, world!"), Inst::jump(label1)],
+                            BasicBlock::new(vec![
+                                Inst::literal(x, "Hello, world!"),
+                                Inst::jump(label1),
+                            ]),
                         ),
                         (
                             label1,
-                            vec![
+                            BasicBlock::new(vec![
                                 Inst::builtin(puts1, BuiltinKind::Puts),
                                 Inst::push_arg(x),
                                 Inst::call(tmp2, puts1),
                                 Inst::literal(tmp1, ()),
                                 Inst::return_(tmp1),
-                            ],
+                            ]),
                         ),
                     ]
                 },
@@ -76,7 +79,7 @@ mod tests {
             &ProgramUnit::simple(Function::simple(
                 0,
                 |[tmp1, tmp2, x, add1, tmp3, puti1, tmp4]| {
-                    vec![
+                    BasicBlock::new(vec![
                         Inst::literal(tmp1, 1),
                         Inst::literal(tmp2, 1),
                         Inst::builtin(add1, BuiltinKind::Add),
@@ -88,7 +91,7 @@ mod tests {
                         Inst::call(tmp4, puti1),
                         Inst::literal(tmp3, ()),
                         Inst::return_(tmp3),
-                    ]
+                    ])
                 },
             )),
         );
@@ -106,32 +109,32 @@ mod tests {
                     vec![
                         (
                             entry,
-                            vec![
+                            BasicBlock::new(vec![
                                 Inst::literal(x, true),
                                 Inst::branch(x, branch_then, branch_else),
-                            ],
+                            ]),
                         ),
                         (
                             branch_then,
-                            vec![
+                            BasicBlock::new(vec![
                                 Inst::literal(s, "x is true"),
                                 Inst::builtin(puts1, BuiltinKind::Puts),
                                 Inst::push_arg(s),
                                 Inst::call(tmp2, puts1),
                                 Inst::literal(tmp1, ()),
                                 Inst::return_(tmp1),
-                            ],
+                            ]),
                         ),
                         (
                             branch_else,
-                            vec![
+                            BasicBlock::new(vec![
                                 Inst::literal(s, "x is false"),
                                 Inst::builtin(puts1, BuiltinKind::Puts),
                                 Inst::push_arg(s),
                                 Inst::call(tmp2, puts1),
                                 Inst::literal(tmp1, ()),
                                 Inst::return_(tmp1),
-                            ],
+                            ]),
                         ),
                     ]
                 },
@@ -151,32 +154,32 @@ mod tests {
                     vec![
                         (
                             entry,
-                            vec![
+                            BasicBlock::new(vec![
                                 Inst::literal(x, false),
                                 Inst::branch(x, branch_then, branch_else),
-                            ],
+                            ]),
                         ),
                         (
                             branch_then,
-                            vec![
+                            BasicBlock::new(vec![
                                 Inst::literal(s, "x is true"),
                                 Inst::builtin(puts1, BuiltinKind::Puts),
                                 Inst::push_arg(s),
                                 Inst::call(tmp2, puts1),
                                 Inst::literal(tmp1, ()),
                                 Inst::return_(tmp1),
-                            ],
+                            ]),
                         ),
                         (
                             branch_else,
-                            vec![
+                            BasicBlock::new(vec![
                                 Inst::literal(s, "x is false"),
                                 Inst::builtin(puts1, BuiltinKind::Puts),
                                 Inst::push_arg(s),
                                 Inst::call(tmp2, puts1),
                                 Inst::literal(tmp1, ()),
                                 Inst::return_(tmp1),
-                            ],
+                            ]),
                         ),
                     ]
                 },
@@ -205,18 +208,18 @@ mod tests {
                     vec![
                         (
                             entry,
-                            vec![
+                            BasicBlock::new(vec![
                                 // let mut sum = 0;
                                 Inst::literal(sum, 0),
                                 // let mut i = 0;
                                 Inst::literal(i, 0),
                                 // goto cond;
                                 Inst::jump(1),
-                            ],
+                            ]),
                         ),
                         (
                             cond,
-                            vec![
+                            BasicBlock::new(vec![
                                 // tmp1 = 10;
                                 Inst::literal(tmp1, 10),
                                 // tmp2 = i < tmp1;
@@ -226,11 +229,11 @@ mod tests {
                                 Inst::call(tmp2, lt1),
                                 // if tmp2 { goto body; } else { goto end; };
                                 Inst::branch(tmp2, body, end),
-                            ],
+                            ]),
                         ),
                         (
                             body,
-                            vec![
+                            BasicBlock::new(vec![
                                 // sum = sum + i;
                                 Inst::builtin(add1, BuiltinKind::Add),
                                 Inst::push_arg(sum),
@@ -244,11 +247,11 @@ mod tests {
                                 Inst::call(i, add1),
                                 // goto cond;
                                 Inst::jump(cond),
-                            ],
+                            ]),
                         ),
                         (
                             end,
-                            vec![
+                            BasicBlock::new(vec![
                                 // puti(sum);
                                 Inst::builtin(puti1, BuiltinKind::Puti),
                                 Inst::push_arg(sum),
@@ -256,7 +259,7 @@ mod tests {
                                 // return;
                                 Inst::literal(tmp4, ()),
                                 Inst::return_(tmp4),
-                            ],
+                            ]),
                         ),
                     ]
                 },
@@ -284,7 +287,7 @@ mod tests {
                     (
                         entry,
                         Function::simple(0, |[tmp1, fib1, tmp2, tmp3, puti1, tmp4]| {
-                            vec![
+                            BasicBlock::new(vec![
                                 // tmp1 = 10;
                                 Inst::literal(tmp1, 10),
                                 // tmp2 = fib(tmp1);
@@ -298,7 +301,7 @@ mod tests {
                                 // return;
                                 Inst::literal(tmp3, ()),
                                 Inst::return_(tmp3),
-                            ]
+                            ])
                         }),
                     ),
                     (
@@ -310,7 +313,7 @@ mod tests {
                                 vec![
                                     (
                                         entry,
-                                        vec![
+                                        BasicBlock::new(vec![
                                             // tmp1 = n < 2;
                                             Inst::literal(tmp2, 2),
                                             Inst::builtin(lt1, BuiltinKind::Lt),
@@ -319,18 +322,18 @@ mod tests {
                                             Inst::call(tmp1, lt1),
                                             // if tmp1 { goto branch_then; } else { goto branch_else; };
                                             Inst::branch(tmp1, branch_then, branch_else),
-                                        ],
+                                        ]),
                                     ),
                                     (
                                         branch_then,
-                                        vec![
+                                        BasicBlock::new(vec![
                                             // return n;
                                             Inst::return_(n),
-                                        ],
+                                        ]),
                                     ),
                                     (
                                         branch_else,
-                                        vec![
+                                        BasicBlock::new(vec![
                                             // tmp4 = n - 1;
                                             Inst::literal(tmp5, -1),
                                             Inst::builtin(add1, BuiltinKind::Add),
@@ -358,7 +361,7 @@ mod tests {
                                             Inst::call(tmp3, add1),
                                             // return tmp3;
                                             Inst::return_(tmp3),
-                                        ],
+                                        ]),
                                     ),
                                 ]
                             },

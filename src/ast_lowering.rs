@@ -293,14 +293,14 @@ mod tests {
             sir::Function::describe(0, |[_tmp1, tmp2, tmp3, puts1, tmp4], [entry]| {
                 vec![(
                     entry,
-                    vec![
+                    sir::BasicBlock::new(vec![
                         Inst::builtin(puts1, sir::BuiltinKind::Puts),
                         Inst::literal(tmp4, "Hello, world!"),
                         Inst::push_arg(tmp4),
                         Inst::call(tmp3, puts1),
                         Inst::literal(tmp2, ()),
                         Inst::return_(tmp2),
-                    ],
+                    ]),
                 )]
             })
         );
@@ -324,7 +324,7 @@ mod tests {
             sir::Function::describe(0, |[tmp1, add1, tmp2, tmp3], [entry]| {
                 vec![(
                     entry,
-                    vec![
+                    sir::BasicBlock::new(vec![
                         Inst::builtin(add1, sir::BuiltinKind::Add),
                         Inst::literal(tmp2, 1),
                         Inst::literal(tmp3, 2),
@@ -332,7 +332,7 @@ mod tests {
                         Inst::push_arg(tmp3),
                         Inst::call(tmp1, add1),
                         Inst::return_(tmp1),
-                    ],
+                    ]),
                 )]
             })
         );
@@ -356,11 +356,11 @@ mod tests {
             sir::Function::describe(0, |[x, tmp1], [entry]| {
                 vec![(
                     entry,
-                    vec![
+                    sir::BasicBlock::new(vec![
                         Inst::literal(x, 42),
                         Inst::copy(tmp1, x),
                         Inst::return_(tmp1),
-                    ],
+                    ]),
                 )]
             })
         );
@@ -391,15 +391,21 @@ mod tests {
                     vec![
                         (
                             entry,
-                            vec![
+                            sir::BasicBlock::new(vec![
                                 Inst::literal(x, 42),
                                 Inst::copy(tmp2, x),
                                 Inst::branch(tmp2, branch_then, branch_else),
-                            ],
+                            ]),
                         ),
-                        (branch_then, vec![Inst::literal(tmp1, 1), Inst::jump(cont)]),
-                        (branch_else, vec![Inst::literal(tmp1, 2), Inst::jump(cont)]),
-                        (cont, vec![Inst::return_(tmp1)]),
+                        (
+                            branch_then,
+                            sir::BasicBlock::new(vec![Inst::literal(tmp1, 1), Inst::jump(cont)]),
+                        ),
+                        (
+                            branch_else,
+                            sir::BasicBlock::new(vec![Inst::literal(tmp1, 2), Inst::jump(cont)]),
+                        ),
+                        (cont, sir::BasicBlock::new(vec![Inst::return_(tmp1)])),
                     ]
                 }
             )
@@ -431,10 +437,13 @@ mod tests {
                 0,
                 |[x, tmp1, cond1, lt1, tmp2, tmp3, add1, tmp4, tmp5], [entry, cond, body, cont]| {
                     vec![
-                        (entry, vec![Inst::literal(x, 42), Inst::jump(cond)]),
+                        (
+                            entry,
+                            sir::BasicBlock::new(vec![Inst::literal(x, 42), Inst::jump(cond)]),
+                        ),
                         (
                             cond,
-                            vec![
+                            sir::BasicBlock::new(vec![
                                 Inst::builtin(lt1, sir::BuiltinKind::Lt),
                                 Inst::literal(tmp2, -1),
                                 Inst::copy(tmp3, x),
@@ -442,11 +451,11 @@ mod tests {
                                 Inst::push_arg(tmp3),
                                 Inst::call(cond1, lt1),
                                 Inst::branch(cond1, body, cont),
-                            ],
+                            ]),
                         ),
                         (
                             body,
-                            vec![
+                            sir::BasicBlock::new(vec![
                                 Inst::builtin(add1, sir::BuiltinKind::Add),
                                 Inst::copy(tmp4, x),
                                 Inst::literal(tmp5, -1),
@@ -455,9 +464,15 @@ mod tests {
                                 Inst::call(x, add1),
                                 Inst::literal(tmp1, ()),
                                 Inst::jump(cond),
-                            ],
+                            ]),
                         ),
-                        (cont, vec![Inst::literal(tmp1, ()), Inst::return_(tmp1)]),
+                        (
+                            cont,
+                            sir::BasicBlock::new(vec![
+                                Inst::literal(tmp1, ()),
+                                Inst::return_(tmp1),
+                            ]),
+                        ),
                     ]
                 }
             )
@@ -482,13 +497,13 @@ mod tests {
             sir::Function::describe(0, |[_tmp1, tmp2, puti1, tmp3], [entry]| {
                 vec![(
                     entry,
-                    vec![
+                    sir::BasicBlock::new(vec![
                         Inst::builtin(puti1, sir::BuiltinKind::Puti),
                         Inst::literal(tmp3, 42),
                         Inst::push_arg(tmp3),
                         Inst::call(tmp2, puti1),
                         Inst::return_(tmp2),
-                    ],
+                    ]),
                 )]
             })
         );

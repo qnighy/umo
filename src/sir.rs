@@ -3,7 +3,8 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::cctx::Id;
+use bit_set::BitSet;
+
 use crate::util::SeqInit;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -98,7 +99,7 @@ impl Function {
 
     pub fn describe<const NV: usize, const NB: usize, F>(num_args: usize, f: F) -> Self
     where
-        F: FnOnce([usize; NV], [usize; NB]) -> Vec<(usize, Vec<Inst>)>,
+        F: FnOnce([usize; NV], [usize; NB]) -> Vec<(usize, BasicBlock)>,
     {
         let bbs_indexed = f(SeqInit::seq(), SeqInit::seq());
         let mut function = Self::new(num_args, NV, vec![BasicBlock::default(); NB]);
@@ -111,16 +112,16 @@ impl Function {
                 i,
                 bb_id
             );
-            function.body[i] = BasicBlock::new(insts);
+            function.body[i] = insts;
         }
         function
     }
 
     pub fn simple<const NV: usize, F>(num_args: usize, f: F) -> Self
     where
-        F: FnOnce([usize; NV]) -> Vec<Inst>,
+        F: FnOnce([usize; NV]) -> BasicBlock,
     {
-        Self::new(num_args, NV, vec![BasicBlock::new(f(SeqInit::seq()))])
+        Self::new(num_args, NV, vec![f(SeqInit::seq())])
     }
 
     fn fmt_debug_with(&self, f: &mut fmt::Formatter<'_>, functions: &[String]) -> fmt::Result {
@@ -137,15 +138,7 @@ impl Function {
                         .entries(vars.iter().map(|v| IdentPrinter(v)))
                         .finish()?;
                     f.write_str("| ")?;
-                    f.debug_list()
-                        .entries(
-                            &self.0.body[0]
-                                .insts
-                                .iter()
-                                .map(|inst| inst.debug_with(&vars, &[], functions))
-                                .collect::<Vec<_>>(),
-                        )
-                        .finish()?;
+                    self.0.body[0].debug_fmt_with(f, &vars, &[], functions)?;
                     Ok(())
                 }
             }
@@ -177,13 +170,7 @@ impl Function {
                     f.write_str("| ")?;
                     f.debug_list()
                         .entries(self.0.body.iter().enumerate().map(|(i, bb)| {
-                            (
-                                i,
-                                bb.insts
-                                    .iter()
-                                    .map(|inst| inst.debug_with(&vars, &blocks, functions))
-                                    .collect::<Vec<_>>(),
-                            )
+                            (i, BasicBlockDebugWrapper(bb, &vars, &blocks, functions))
                         }))
                         .finish()?;
                     Ok(())
@@ -214,6 +201,9 @@ impl fmt::Debug for IdentPrinter<'_> {
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
 pub struct BasicBlock {
     pub insts: Vec<Inst>,
+    // live_out can be cheaply computed from the last instruction
+    /// Variables that are live at the beginning of this block
+    pub live_in: Option<BitSet<usize>>,
 }
 
 impl BasicBlock {
@@ -223,31 +213,81 @@ impl BasicBlock {
     {
         Self {
             insts: insts.into(),
+            live_in: None,
         }
+    }
+    pub fn with_live_in(mut self, live_in: BitSet<usize>) -> Self {
+        self.live_in = Some(live_in);
+        self
+    }
+
+    fn debug_fmt_with(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        vars: &[String],
+        blocks: &[String],
+        functions: &[String],
+    ) -> fmt::Result {
+        f.debug_tuple("BasicBlock::new")
+            .field(&InstsDebugWrapper(&self.insts, vars, blocks, functions))
+            .finish()?;
+        if let Some(live_in) = &self.live_in {
+            f.debug_tuple(".with_live_in")
+                .field(&BitSetDebugWrapper(live_in, vars))
+                .finish()?;
+        }
+        Ok(())
     }
 }
 
 impl fmt::Debug for BasicBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("BasicBlock::new").field(&self.insts).finish()
+        self.debug_fmt_with(f, &[], &[], &[])
+    }
+}
+
+struct BasicBlockDebugWrapper<'a>(&'a BasicBlock, &'a [String], &'a [String], &'a [String]);
+impl fmt::Debug for BasicBlockDebugWrapper<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.debug_fmt_with(f, self.1, self.2, self.3)
+    }
+}
+
+struct InstsDebugWrapper<'a>(&'a [Inst], &'a [String], &'a [String], &'a [String]);
+impl fmt::Debug for InstsDebugWrapper<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let insts = self.0;
+        let vars = self.1;
+        let blocks = self.2;
+        let functions = self.3;
+        f.debug_list()
+            .entries(
+                insts
+                    .iter()
+                    .map(|inst| InstDebugWrapper(inst, vars, blocks, functions)),
+            )
+            .finish()
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Inst {
-    pub id: Id,
     pub kind: InstKind,
+    // live_in can be cheaply computed from live_out
+    /// Variables that are live after this instruction
+    pub live_out: Option<BitSet<usize>>,
 }
 
 impl Inst {
     pub fn new(kind: InstKind) -> Self {
         Self {
-            id: Id::default(),
             kind,
+            live_out: None,
         }
     }
-    pub fn with_id(self, id: Id) -> Self {
-        Self { id, ..self }
+    pub fn with_live_out(mut self, live_out: BitSet<usize>) -> Self {
+        self.live_out = Some(live_out);
+        self
     }
 
     pub fn jump(target: usize) -> Self {
@@ -364,8 +404,10 @@ impl Inst {
                 .field(&VarDebugWrapper(*callee, vars))
                 .finish()?,
         }
-        if !self.id.is_dummy() {
-            f.debug_tuple(".with_id").field(&self.id).finish()?;
+        if let Some(live_out) = &self.live_out {
+            f.debug_tuple(".with_live_out")
+                .field(&BitSetDebugWrapper(live_out, vars))
+                .finish()?;
         }
         Ok(())
     }
@@ -374,6 +416,26 @@ impl Inst {
 impl fmt::Debug for Inst {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.fmt_debug_with(f, &[], &[], &[])
+    }
+}
+
+struct BitSetDebugWrapper<'a>(&'a BitSet<usize>, &'a [String]);
+impl fmt::Debug for BitSetDebugWrapper<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let vars = self.1;
+        f.debug_list()
+            .entries(self.0.iter().map(|v| VarDebugWrapper(v, vars)))
+            .finish()?;
+        f.write_str(".into_iter()")?;
+        f.write_str(".collect()")?;
+        Ok(())
+    }
+}
+
+struct InstDebugWrapper<'a>(&'a Inst, &'a [String], &'a [String], &'a [String]);
+impl fmt::Debug for InstDebugWrapper<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt_debug_with(f, self.1, self.2, self.3)
     }
 }
 

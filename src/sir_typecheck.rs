@@ -325,14 +325,14 @@ mod tests {
             ProgramUnit::simple(Function::describe(0, |[x, tmp1, puti1, tmp2], [entry]| {
                 vec![(
                     entry,
-                    vec![
+                    BasicBlock::new(vec![
                         Inst::builtin(puti1, BuiltinKind::Puti),
                         Inst::literal(x, 42),
                         Inst::push_arg(x),
                         Inst::call(tmp2, puti1),
                         Inst::literal(tmp1, ()),
                         Inst::return_(tmp1),
-                    ],
+                    ]),
                 )]
             }));
         assert!(typecheck(&cctx, &program_unit).is_ok());
@@ -342,12 +342,12 @@ mod tests {
     fn test_typecheck_failure_too_few_arg() {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |[tmp1, puti1, tmp2]| {
-            vec![
+            BasicBlock::new(vec![
                 Inst::builtin(puti1, BuiltinKind::Puti),
                 Inst::call(tmp2, puti1),
                 Inst::literal(tmp1, ()),
                 Inst::return_(tmp1),
-            ]
+            ])
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }
@@ -356,7 +356,7 @@ mod tests {
     fn test_typecheck_failure_too_many_arg() {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |[x, tmp1, puti1, tmp2]| {
-            vec![
+            BasicBlock::new(vec![
                 Inst::literal(x, 42),
                 Inst::builtin(puti1, BuiltinKind::Puti),
                 Inst::push_arg(x),
@@ -364,7 +364,7 @@ mod tests {
                 Inst::call(tmp2, puti1),
                 Inst::literal(tmp1, ()),
                 Inst::return_(tmp1),
-            ]
+            ])
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }
@@ -373,14 +373,14 @@ mod tests {
     fn test_typecheck_failure_arg_type_mismatch() {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |[x, tmp1, puti1, tmp2]| {
-            vec![
+            BasicBlock::new(vec![
                 Inst::literal(x, "Hello, world!"),
                 Inst::builtin(puti1, BuiltinKind::Puti),
                 Inst::push_arg(x),
                 Inst::call(tmp2, puti1),
                 Inst::literal(tmp1, ()),
                 Inst::return_(tmp1),
-            ]
+            ])
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }
@@ -389,12 +389,12 @@ mod tests {
     fn test_typecheck_failure_runaway_arg() {
         let cctx = CCtx::new();
         let program_unit = ProgramUnit::simple(Function::simple(0, |[x, tmp1]| {
-            vec![
+            BasicBlock::new(vec![
                 Inst::literal(x, "Hello, world!"),
                 Inst::literal(tmp1, ()),
                 Inst::push_arg(x),
                 Inst::return_(tmp1),
-            ]
+            ])
         }));
         assert!(typecheck(&cctx, &program_unit).is_err());
     }
