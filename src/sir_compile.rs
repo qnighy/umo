@@ -6,6 +6,9 @@ use crate::cctx::CCtx;
 use crate::sir::{BasicBlock, Function, Inst, InstKind, ProgramUnit};
 
 pub fn compile(cctx: &CCtx, program_unit: &ProgramUnit) -> ProgramUnit {
+    if cfg!(debug_assert) {
+        program_unit.validate_insts().unwrap();
+    }
     let mut program_unit = program_unit.clone();
     for function in &mut program_unit.functions {
         *function = compile_function(cctx, function);

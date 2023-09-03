@@ -14,6 +14,7 @@ mod sir;
 mod sir_compile;
 mod sir_eval;
 mod sir_typecheck;
+mod sir_validation;
 pub mod testing;
 mod util;
 
