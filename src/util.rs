@@ -1,3 +1,5 @@
+pub mod debug_utils;
+
 pub(crate) trait SeqInit {
     fn seq() -> Self;
 }
