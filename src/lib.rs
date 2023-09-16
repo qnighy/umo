@@ -6,6 +6,7 @@ use cctx::CCtx;
 
 mod ast;
 mod ast_lowering;
+pub mod ast_typecheck;
 mod cctx;
 mod eval_;
 pub mod ntype;

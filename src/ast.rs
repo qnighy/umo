@@ -286,7 +286,7 @@ pub fn assign_id_stmts(cctx: &CCtx, scope: &mut Scope, stmts: &mut Vec<Stmt>) {
     scope.rollback(checkpoint);
 }
 
-fn assign_id_stmt(cctx: &CCtx, scope: &mut Scope, stmt: &mut Stmt) {
+pub fn assign_id_stmt(cctx: &CCtx, scope: &mut Scope, stmt: &mut Stmt) {
     match stmt {
         Stmt::Let { lhs, init } => {
             assign_id_expr(cctx, scope, init);
@@ -299,7 +299,7 @@ fn assign_id_stmt(cctx: &CCtx, scope: &mut Scope, stmt: &mut Stmt) {
     }
 }
 
-fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
+pub fn assign_id_expr(cctx: &CCtx, scope: &mut Scope, expr: &mut Expr) {
     match expr {
         Expr::Var { ident } => {
             if let Some(&found_id) = scope.bindings.get(&ident.name) {
