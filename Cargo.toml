@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bit-set = "0.5.3"
 clap = { version = "4.3.19", features = ["derive"] }
+option-cell = "0.1.0"
 thiserror = "1.0.48"
 
 [dev-dependencies]

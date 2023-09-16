@@ -9,7 +9,6 @@ mod ast_lowering;
 mod cctx;
 mod eval_;
 pub mod ntype;
-mod option_once_cell;
 mod parser;
 pub mod rt_ctx;
 mod sir;

@@ -2,7 +2,7 @@ use std::fmt;
 
 use thiserror::Error;
 
-use crate::option_once_cell::OptionOnceCell;
+use option_cell::OptionCell;
 
 #[derive(Debug, Error)]
 #[error("Unification failure")]
@@ -67,7 +67,7 @@ impl Type {
             return ty;
         }
     }
-    fn resolve2<'a>(&'a self, vars: &'a [OptionOnceCell<Type>]) -> &'a Type {
+    fn resolve2<'a>(&'a self, vars: &'a [OptionCell<Type>]) -> &'a Type {
         let mut ty = self;
         loop {
             match ty {
@@ -84,13 +84,13 @@ impl Type {
     }
 
     pub fn unify(&self, other: &Self, ctx: &mut TyCtx) -> Result<(), UnificationFailure> {
-        let vars = OptionOnceCell::from_slice(&mut ctx.vars);
+        let vars = OptionCell::from_mut_slice(&mut ctx.vars);
         self.unify_impl(other, vars)
     }
     fn unify_impl(
         &self,
         other: &Self,
-        vars: &[OptionOnceCell<Type>],
+        vars: &[OptionCell<Type>],
     ) -> Result<(), UnificationFailure> {
         let ty1 = self.resolve2(vars);
         let ty2 = other.resolve2(vars);
@@ -141,7 +141,7 @@ impl Type {
         }
     }
 
-    fn has_fv(&self, var_id: usize, vars: &[OptionOnceCell<Type>]) -> bool {
+    fn has_fv(&self, var_id: usize, vars: &[OptionCell<Type>]) -> bool {
         let ty = self.resolve2(vars);
         match ty {
             Type::MetaVar { var_id: id } => *id == var_id,

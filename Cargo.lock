@@ -194,6 +194,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
+name = "option-cell"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91c84482740392964831d3a3c143c7b33712738ee5bf21f8ab1d7e80590bee2e"
+
+[[package]]
 name = "pretty_assertions"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -277,6 +283,7 @@ version = "0.0.1"
 dependencies = [
  "bit-set",
  "clap",
+ "option-cell",
  "pretty_assertions",
  "thiserror",
 ]
